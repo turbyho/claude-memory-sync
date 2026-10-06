@@ -1,0 +1,26 @@
+# Forbidden patterns in the team memory: extended regular expressions (grep -E).
+# One pattern on each line. A line that starts with "#" is a comment.
+# To change the patterns for your team, copy this file to .memory-check in the root of
+# the team repository.
+#
+# Absolute paths in home directories
+/home/[A-Za-z0-9._-]+
+/Users/[A-Za-z0-9._-]+
+/root/
+# Home directory shortcuts
+(^|[^A-Za-z0-9_.:/-])~/
+\$HOME
+%USERPROFILE%
+# Windows drive letters and network shares
+(^|[^A-Za-z0-9])[A-Za-z]:\\
+\\\\[A-Za-z0-9._-]+\\
+# Links to local files
+file://
+# Mount points and devices of one machine
+/mnt/
+/media/
+/Volumes/
+/dev/tty
+/dev/cu\.
+# Markdown links to absolute paths, or out of the memory directory
+\]\((/|~|\.\./\.\.)
