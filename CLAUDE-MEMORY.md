@@ -35,6 +35,12 @@ description: `~/.claude/claude-memory/README.md`. Full procedure: skill
    can be correct for all persons, and the project has a team memory.
 4. Personal: all other records.
 
+Then select the place of a team or personal record. If the fact applies to more than one
+project, write it into a shared topic of its role (`users/<user>/shared/<topic>/` or
+`shared/<topic>/`), not into one project and not as a copy into each project. If no topic
+fits, propose a new topic to the user, and make it only after the approval. A local
+record always stays in the project.
+
 ### Rules for memory writes
 
 1. Each personal record must have a line in `MEMORY.md`, or in the `INDEX.md` of its

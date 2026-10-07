@@ -80,7 +80,27 @@ Do not ask about the role of a `local` or a `personal` record.
 If a fact has a general part and a machine part, write two records: the general fact as
 `team` or `personal`, the machine detail as `local`. Link them with `[[name]]`.
 
-### 3.2 Local memory
+### 3.2 Select the place: project or shared topic
+
+After the role, select the place of a `team` or `personal` record:
+
+| The fact applies to | Role `personal` | Role `team` |
+|---|---|---|
+| One project | `<memory>/` | `projects/<name>/team/` |
+| More than one project | Personal shared topic `users/<user>/shared/<topic>/` | Team shared topic `shared/<topic>/` |
+
+1. If the fact applies to more than one project, look at the shared topics of its role.
+   The `## Groups` section of `MEMORY.md` links to them. Also run `ls` on
+   `~/.claude/claude-memory/shared/` and `~/.claude/claude-memory/users/<user>/shared/`.
+2. If a topic covers the fact, write the record into that topic (section 6).
+3. If no topic covers the fact, propose a new topic to the user: its name, its role and
+   the projects that use it. Make it only after the approval (section 11.1). If the user
+   does not approve, write the record into the project.
+
+A `local` record always stays in the project: `<memory>/hosts/<host>/`. There are no
+local shared topics.
+
+### 3.3 Local memory
 
 - The hook `SessionStart` puts the first 100 lines of `hosts/<host>/INDEX.md` into your
   context. Thus a local record does not need a line in `MEMORY.md`.
@@ -158,8 +178,8 @@ information about a topic:
 2. Read `invalid/INDEX.md`, `## Invalid` of the local index, and the invalid team
    records. If the new fact is equal to an invalid claim, do not write it. Tell the user
    that the memory has this claim as invalid, and give the reason.
-3. Select the role (section 3.1).
-4. Write the record from `templates/record.md`:
+3. Select the role (section 3.1) and the place (section 3.2).
+4. Write the record from `templates/record.md` into the place:
    - `status: tentative`
    - `role`
    - `source` and `evidence`: where the fact comes from. Give `path:line`, a command, or
@@ -174,6 +194,9 @@ information about a topic:
    - `local`: in `hosts/<host>/INDEX.md`. If the file does not exist, make it from
      `templates/LOCAL-INDEX.md`.
    - `team`: none. The team memory has no index file (section 12).
+   - Shared topic: the topic has no index file. Make sure that `## Groups` of
+     `MEMORY.md` has the line of the topic, and that its key words cover the new record.
+     If the topic has lines for each record, add one (section 11).
 7. To update an existing record, change its text and add a history line `edited`. If the
    change contradicts the old text of a confirmed record, use section 8.
 
@@ -344,16 +367,47 @@ The two types have the same structure:
 - The topic has no index file. To see its records, search with Grep for `^description:`
   in the topic directory.
 - Its invalid records go to `<topic>/invalid/`.
-- `MEMORY.md` of each project that uses the topic has one line in `## Groups`. Below it,
-  it can have one indented line for each record:
-
-  ```
-  - [Test server](~/.claude/claude-memory/shared/test-server/) - shared: SSH access, database schema
-    - [SSH access](~/.claude/claude-memory/shared/test-server/ssh-access.md) - user, key, jump host
-  ```
-
 - Do not make a symlink to a shared topic. The repository contains no symlinks, because
   git cannot make them on all systems.
+
+Index lines in `MEMORY.md` of each project that uses the topic:
+
+- **Topic line (necessary).** One line in `## Groups`: the link to the topic directory,
+  and the key words of all its records. You find a record of the topic through these key
+  words, thus keep them complete.
+- **Record lines (optional).** Below the topic line, one indented line for each record.
+  Use them for a small topic (10 records or less), where they help you to find a record.
+  If a topic has record lines, they must list all its records. When you add, remove or
+  invalidate a record of the topic, change the record lines in `MEMORY.md` of each
+  project in the list of `<topic>/README.md`.
+
+```
+- [Test server](~/.claude/claude-memory/shared/test-server/) - shared: SSH access, database schema
+  - [SSH access](~/.claude/claude-memory/shared/test-server/ssh-access.md) - user, key, jump host
+```
+
+For a team shared topic, change only your own `MEMORY.md` (in `users/<user>/`). Do not
+change the personal memory of a different person. Tell the user which projects and persons
+must add the topic line.
+
+### 11.1 Make a topic, or move records into it
+
+Do this only after the approval of the user (section 3.2).
+
+1. Select a short name in kebab case, for example `test-server`. Select the role:
+   personal (`users/<user>/shared/<topic>/`) or team (`shared/<topic>/`).
+2. Make the directory and its `invalid/` subdirectory.
+3. Write `<topic>/README.md`: one sentence about the topic, the rules, and the list of
+   the projects that use it (`projects/<name>/`).
+4. Move the records of the topic from the projects into the topic directory. Do not
+   change their names, thus the links `[[name]]` stay correct. If two projects have a
+   record with the same name, merge the two records into one (section 7.2, "Merge").
+   For a team topic, the records must agree with section 12 (no absolute paths, no
+   machine names).
+5. Add a history line to each moved record: `moved to shared topic <topic>`.
+6. In `MEMORY.md` of each project in the list: remove the lines of the moved records, and
+   add the topic line in `## Groups` (and the record lines, if you use them).
+7. Tell the user what you moved, and which `MEMORY.md` files you changed.
 
 ## 12. Team memory
 

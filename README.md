@@ -87,7 +87,8 @@ You can ask Claude to do these tasks in any language. Some examples:
 | Team memory | "Save to the team memory: the integration tests need the docker service." |
 | Local memory | "Remember for this machine: the debug probe is on /dev/ttyACM0." |
 | Show the local memory | "What is in the local memory of this machine?" |
-| Shared topic | "Make a shared topic `test-server` for the projects example-app and example-api, and move the facts about the test server into it." |
+| Team shared topic | "Make a team shared topic `test-server` for the projects example-app and example-api, and move the facts about the test server into it." |
+| Personal shared topic | "Make a personal shared topic `nas` for all my projects that use the NAS, and move my NAS records into it." |
 | Review the memory | "Review the tentative memory records." |
 | Confirm a record | "The record about the build with ninja is correct. Promote it." |
 | Invalidate a record | "The record about the build with ninja is not correct any more: make works again since commit abc123. Invalidate it." |
@@ -197,7 +198,8 @@ alice, Linux:  ~/.claude/projects/-home-alice-src-example-app/memory    --+-- sy
         invalid/                   <- known false records
         hosts/laptop/              <- local memory of one machine of alice
     users/bob/                     <- personal memory of bob
-~/.claude/claude-memory/shared/test-server/   <- shared topic (section 9)
+~/.claude/claude-memory/shared/test-server/        <- team shared topic (section 9)
+~/.claude/claude-memory/users/alice/shared/nas/    <- personal shared topic of alice
 ```
 
 Git syncs the repository between all machines and all persons.
@@ -211,7 +213,7 @@ Git syncs the repository between all machines and all persons.
 | `projects/<name>/users/<user>/hosts/<host>/` | Local memory of one machine (section 5.3). |
 | `projects/_home/` | Memory of the sessions that start in the home directory. |
 | `shared/<topic>/` | Team shared topics (section 9). |
-| `users/<user>/shared/<topic>/` | Personal shared topics (section 9.1). |
+| `users/<user>/shared/<topic>/` | Personal shared topics (section 9). |
 | `CLAUDE-MEMORY.md` | Instructions for Claude. You import them into `~/.claude/CLAUDE.md`. |
 | `skills/memory-lifecycle/` | Skill for Claude: roles and lifecycle (sections 5 and 10), with templates. |
 | `team-memory-check.default` | Forbidden patterns in the team memory (section 5.1). |
@@ -348,6 +350,10 @@ lines of `hosts/<host>/INDEX.md` to Claude, thus the local records do not use th
 
 Claude asks only in case 3. If a fact has a general part and a machine part, Claude
 writes two records: the general fact as team or personal, the machine detail as local.
+
+If a team or personal fact applies to more than one project, Claude writes it into a
+shared topic of its role (section 9), not into one project and not as a copy into each
+project. A local record always stays in the project.
 
 ### 5.5 Privacy
 
@@ -515,42 +521,61 @@ To remove the full project with its team memory, remove `projects/<name>/` with
 ## 9. Shared topics
 
 Some facts apply to more than one project, for example the access to a test server, or the
-schema of a database. Write such a fact one time, in `shared/<topic>/`, and put a link to
-the topic into each project that uses it. A shared topic is team memory: all persons see
-it, and the rules of section 5.1 apply.
+schema of a database. A shared topic holds such facts one time. Each project that uses the
+topic has a link to it.
 
-1. Make the topic:
+| Type | Location | For | Check of the team memory |
+|---|---|---|---|
+| Team shared topic | `shared/<topic>/` | Facts that are correct for all persons | Yes (section 5.1) |
+| Personal shared topic | `users/<user>/shared/<topic>/` | Facts of one person, for example the access to a home server with paths in the home directory | No |
 
-   ```sh
-   mkdir -p ~/.claude/claude-memory/shared/test-server
-   ```
+A local record (section 5.3) is never in a shared topic.
 
-2. Write `shared/test-server/README.md`. Give the rules of the topic and the list of the
-   projects that use it.
+### 9.1 How Claude uses the topics
 
-3. Write the records into `shared/test-server/`. The topic has no index file. Claude
-   finds the records with Grep for `^description:`.
+- When Claude writes a team or personal fact that applies to more than one project, it
+  writes the fact into a shared topic of the same role.
+- If no topic fits, Claude proposes a new topic: its name, its role and its projects.
+  Claude makes the topic only after your approval.
+- To make a topic and move existing records into it, use a prompt of section 2. Claude
+  moves the records, and changes the links in `MEMORY.md` of each project.
 
-4. In `MEMORY.md` of each person and project that uses the topic, add one line in
-   `## Groups`:
+### 9.2 Structure
 
-   ```
-   - [Test server](~/.claude/claude-memory/shared/test-server/) - shared: SSH access, database schema
-   ```
+- `<topic>/README.md` gives the rules of the topic and the list of the projects that use
+  it.
+- The topic has no index file. Claude finds its records through the topic line in
+  `MEMORY.md`, and with Grep for `^description:` in the topic directory.
+- Invalid records go to `<topic>/invalid/`.
+- The repository contains no symlinks. The link is a path in `MEMORY.md`, thus it
+  operates on each system, also where git cannot make symlinks.
 
-The repository contains no symlinks. The link is a path in `MEMORY.md`, thus it operates
-on each system, also where git cannot make symlinks.
+### 9.3 Links in MEMORY.md
 
-### 9.1 Personal shared topics
-
-Some facts are personal, but more than one of your projects uses them, for example your
-access to a home server, with paths in your home directory. Put them into a personal
-shared topic: `users/<user>/shared/<topic>/`. The structure is the same, but the check of
-the team memory does not apply. The link in `MEMORY.md`:
+`MEMORY.md` of each project that uses the topic has one topic line in `## Groups`: the
+link to the topic directory, and the key words of all its records. Below it, a small
+topic (10 records or less) can have one indented line for each record:
 
 ```
-- [Home server](~/.claude/claude-memory/users/alice/shared/home-server/) - personal shared topic: SSH, backups
+- [Test server](~/.claude/claude-memory/shared/test-server/) - shared: SSH access, database schema
+  - [SSH access](~/.claude/claude-memory/shared/test-server/ssh-access.md) - user, key, jump host
 ```
+
+The topic line is necessary. The record lines are optional. If a topic has record lines,
+they must list all its records, thus a new record of the topic changes `MEMORY.md` of
+each project that uses the topic. Without record lines, a new record changes only the
+topic directory.
+
+`MEMORY.md` is personal. For a team shared topic, each person adds the topic line to the
+own `MEMORY.md`. Claude does not change the personal memory of a different person.
+
+### 9.4 Make a topic by hand
+
+1. Make the directory, for example `mkdir -p ~/.claude/claude-memory/shared/test-server/invalid`.
+2. Write `<topic>/README.md` with the rules and the list of the projects.
+3. Move the records into the topic directory. Do not change their names.
+4. In `MEMORY.md` of each project: remove the lines of the moved records, and add the
+   topic line in `## Groups`.
 
 ## 10. Memory lifecycle
 
