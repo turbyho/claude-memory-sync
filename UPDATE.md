@@ -112,6 +112,11 @@ example, the user changed the skill), and the release changes the same lines.
 Each release can add steps here. Do the steps of each release after the old version, in
 the sequence of the versions.
 
+### v0.2.1
+
+No more steps. After the update, you can run `~/.claude/claude-memory/tools/validate.sh`
+for each memory repository (`sync.sh repos` shows them), and tell the user the result.
+
 ### v0.2.0
 
 No more steps. After the update, tell the user that projects can now use different

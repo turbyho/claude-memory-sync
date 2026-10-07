@@ -4,6 +4,16 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.2.1 - 2026-10-07
+
+- New tools for the migration of an older memory (README.md, section 6.4):
+  `tools/migrate.sh`, `tools/validate.sh`, `tools/local-candidates.sh`,
+  `tools/relink.sh`.
+- `tools/validate.sh <memory repo>` checks a memory repository: index links, index
+  lines, frontmatter, team memory.
+- Automatic tests in `tests/` (README.md, section 15).
+- `sync.sh` does not change. Nothing to do for the user.
+
 ## v0.2.0 - 2026-10-07
 
 - More memory repositories: a project can use a different repository than the main
