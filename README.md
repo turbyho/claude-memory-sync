@@ -32,6 +32,7 @@ Contents:
 12. [Troubleshooting](#12-troubleshooting)
 13. [Remove from a machine](#13-remove-from-a-machine)
 14. [Instructions for Claude: installation](#14-instructions-for-claude-installation)
+15. [Development](#15-development)
 
 ## 1. Quick start with Claude
 
@@ -222,6 +223,8 @@ Git syncs the repository between all machines and all persons.
 | `sync.sh` | Sync script (POSIX sh). The hooks call it. |
 | `VERSION`, `CHANGELOG.md` | Version of the tool and its changes (section 7.1). |
 | `UPDATE.md` | Instructions for Claude: update of the tool and setup of a machine. |
+| `tools/` | Migration of an older memory (section 6.4), and a check of a memory repository. |
+| `tests/` | Automatic tests of the tool (section 15). |
 
 ### 4.2 Project name
 
@@ -510,7 +513,55 @@ Requirements:
 
    Then start a new Claude Code session in the project and ask: "What is in your memory?"
 
-### 6.4 Other location of the repository
+### 6.4 Migrate an older memory
+
+If you synced the memory before with an older layout (`projects/<name>/` with the records,
+and shared directories at the root that the projects link with symlinks), migrate it:
+
+1. Rename the old clone, then make the new memory repository (section 6.1). Do not set
+   up the machine yet:
+
+   ```sh
+   mv ~/.claude/claude-memory ~/.claude/claude-memory-old
+   ```
+
+   The tools below are in `~/.claude/claude-memory/tools/` of the new repository.
+2. Find the records that describe one machine only, and write them into a file, one line
+   `<project>/<file>.md` each:
+
+   ```sh
+   ~/.claude/claude-memory/tools/local-candidates.sh ~/.claude/claude-memory-old > candidates.txt
+   ```
+
+   Read each candidate. Only a record that describes one machine is local. A general fact
+   with a path as an example stays personal.
+3. Migrate. The script reads the old repository, and writes into the new one:
+
+   ```sh
+   ~/.claude/claude-memory/tools/migrate.sh --old ~/.claude/claude-memory-old --new ~/.claude/claude-memory \
+     --user "$(~/.claude/claude-memory/sync.sh user)" \
+     --host "$(~/.claude/claude-memory/sync.sh host)" --local local.txt
+   ```
+
+   - Records with `metadata.verified` become `confirmed`, the other records `tentative`.
+     Use `--status confirmed` or `--status tentative` to give all records one state.
+   - Each shared directory becomes a personal shared topic `users/<user>/shared/<dir>/`.
+4. Do a check, read the result, then commit and push:
+
+   ```sh
+   ~/.claude/claude-memory/tools/validate.sh ~/.claude/claude-memory
+   ```
+
+5. Point the memory symlinks of each machine to the new repository, then set up the
+   machine (section 6.3):
+
+   ```sh
+   ~/.claude/claude-memory/tools/relink.sh ~/.claude/claude-memory-old ~/.claude/claude-memory "$(~/.claude/claude-memory/sync.sh user)"
+   ```
+
+Keep the old repository until all your machines use the new one.
+
+### 6.5 Other location of the repository
 
 The script finds the repository from its own location, and `sync.sh setup` uses that
 location for the hooks, the import line and the skill symlink. As an alternative, set the
@@ -931,6 +982,31 @@ Tell the user:
   start of a session
 - That each person with access to the repository can read all its memory
 - What to do on the other machines and for other persons: the prompt of section 1
+
+## 15. Development
+
+The tests run in temporary directories. Each simulated machine has its own `HOME`, thus
+the tests do not touch your `~/.claude`. They need `git`, and `jq` or `python3`.
+
+```sh
+tests/run.sh
+```
+
+| Test | What it tests |
+|---|---|
+| `tests/test-roles.sh` | Roles, linking, adoption of a local memory, team memory check, disable, slug of a subdirectory and of a worktree |
+| `tests/test-update.sh` | Setup (with `jq` and with `python3`), notices, update, conflict at an update |
+| `tests/test-repos.sh` | More memory repositories: add-repo, enable --repo, move, relink, local copy |
+| `tests/test-migrate.sh` | `tools/migrate.sh`, `tools/validate.sh`, `tools/relink.sh` |
+
+Rules for a change:
+
+- `sync.sh` and the tools are POSIX sh. They must operate on Linux and macOS.
+- The text of the files is ASD-STE100 (Simplified Technical English), UTF-8, LF.
+- The repository contains no symlinks and no private data (names, paths, host names).
+- If you change the setup of a machine, increase `SETUP_VERSION` (section 7.2).
+- If you change `sync.sh`, keep section 14 and `UPDATE.md` correct.
+- Run `tests/run.sh` before each commit. Add a test for each new function.
 
 ## License
 
