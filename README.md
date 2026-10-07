@@ -95,7 +95,7 @@ her team:
             └── nas/                       PERSONAL SHARED TOPIC of alice
 
 ~/.claude/claude-memory.d/
-└── work/                                  PROJECT REPOSITORY "work" (git: team/claude-memory)
+└── work/                                  PROJECT REPOSITORY, alias "work" (git: team/work-claude-memory)
     ├── projects/
     │   └── example-app/                   a work project, same structure as above
     │       ├── team/
@@ -120,13 +120,18 @@ of a repository is different for each person:
 | Main repository | `~/.claude/claude-memory` | The hooks run its `sync.sh`. New projects go into it. Its `users/<user>/repos.conf` lists the other repositories of the person. |
 | Project repository | `~/.claude/claude-memory.d/<alias>/` | Holds the memory of some projects. You give it a short name, the alias. |
 
+The alias is the local short name of a project repository: the name of its clone
+directory, and the name in the commands (`--repo work`). It does not have to be equal to
+the name of the repository on the git server. Each person selects an own alias. In the
+examples, the work repository `team/work-claude-memory` has the alias `work`.
+
 Each project is in one repository. One repository can be the main repository of one
 person and a project repository of an other person:
 
 | Repository | alice | bob |
 |---|---|---|
 | `alice/claude-memory` (private) | main | - |
-| `team/claude-memory` (team) | project repository `work` | main |
+| `team/work-claude-memory` (team) | project repository, alias `work` | main |
 
 ### 2.3 Roles of a record
 
@@ -245,8 +250,9 @@ Your projects are enabled already.
 **With a team repository as project repository (setup B or C):** add to the prompt:
 
 ```text
-Then add git@git.example.com:team/claude-memory.git as the project repository "work",
-and enable these projects in it: ~/work/example-app.
+Then add the work repository git@git.example.com:team/work-claude-memory.git as a
+project repository with the alias "work", and enable these projects in it:
+~/work/example-app.
 ```
 
 **A team member who uses the team repository as main repository (setup D):** give the
@@ -300,7 +306,7 @@ team repository as the main memory repository in the first prompt.
 |---|---|
 | Enable a project in the main repository | `sync.sh enable ~/work/example-app` |
 | Enable the memory of the home directory | `sync.sh enable ~` |
-| Add a project repository | `sync.sh add-repo work git@git.example.com:team/claude-memory.git` |
+| Add a project repository with the alias `work` | `sync.sh add-repo work git@git.example.com:team/work-claude-memory.git` |
 | Enable a project in a project repository | `sync.sh enable ~/work/example-app --repo work` |
 
 `sync.sh` is `~/.claude/claude-memory/sync.sh`. An enabled project and an added
@@ -336,8 +342,8 @@ You can give these prompts in any language:
 | Check a claim | "Is the claim that the API needs a token in the invalid memory records?" |
 | Shared topic | "Make a personal shared topic `nas` for my projects that use the NAS, and move the NAS records into it." |
 | Enable a project | "Enable the memory for this project." |
-| Other repository | "Add the memory repository `work` (git@git.example.com:team/claude-memory.git), and move this project to it." |
-| Renamed repository | "The repository `work` is now git@git.example.com:team/memory.git. Rename the alias to `team`." |
+| Other repository | "Add the memory repository git@git.example.com:team/work-claude-memory.git with the alias `work`, and move this project to it." |
+| Renamed repository | "The repository with the alias `work` is now git@git.example.com:team/team-claude-memory.git. Rename the alias to `team`." |
 | History | "Show the changes to the memory of this project in the last week." |
 | Update the tool | "Update claude-memory-sync." |
 

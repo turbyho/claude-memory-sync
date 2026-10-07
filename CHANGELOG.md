@@ -4,6 +4,12 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.8 - 2026-10-07
+
+- README.md: clearer examples. The work repository on the git server is
+  `team/work-claude-memory`, and its alias is `work`. Section 2.2 explains the alias.
+- Nothing to do for the user.
+
 ## v0.3.7 - 2026-10-07
 
 - README.md is new: it is only for people, with clear parts. Section 2 shows the full

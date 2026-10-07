@@ -112,6 +112,10 @@ example, the user changed the skill), and the release changes the same lines.
 Each release can add steps here. Do the steps of each release after the old version, in
 the sequence of the versions.
 
+### v0.3.8
+
+No more steps.
+
 ### v0.3.7
 
 No more steps.
