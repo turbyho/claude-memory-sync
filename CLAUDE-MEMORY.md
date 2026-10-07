@@ -2,9 +2,9 @@
 
 The auto memory of some projects is in git repositories. A sync script copies it to all
 machines and to all persons that use the repository. The tool is in the main repository
-`~/.claude/claude-memory`. Full description: `~/.claude/claude-memory/README.md`. Full
-procedure: skill `memory-lifecycle`. Load the skill before you write, review or
-invalidate a record.
+`~/.claude/claude-memory`. Description for people: `~/.claude/claude-memory/README.md`.
+Procedures for you: skill `memory-lifecycle` (records), `INSTALL.md` (installation),
+`UPDATE.md` (update). Load the skill before you write, review or invalidate a record.
 
 `<repo>` is the memory repository of the project: the main repository, or a different
 repository in `~/.claude/claude-memory.d/<alias>/`. `sync.sh status` shows it. The

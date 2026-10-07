@@ -4,6 +4,18 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.7 - 2026-10-07
+
+- README.md is new: it is only for people, with clear parts. Section 2 shows the full
+  structure (repositories, projects, team, personal and local memory, shared topics,
+  states), section 3 the possible setups (one person, private and work, team).
+- New file INSTALL.md: the installation procedure for Claude. The installation prompt
+  now refers to INSTALL.md.
+- Removed: the migration of an older memory layout (`tools/migrate.sh`,
+  `local-candidates.sh`, `relink.sh`, `visible-notes.sh`). That layout was never public.
+  `tools/validate.sh` stays.
+- Nothing to do for the user.
+
 ## v0.3.6 - 2026-10-07
 
 - Fixed: `tools/relink.sh` did not change the memory symlinks on a second machine after
@@ -22,7 +34,7 @@ the user must do.
 - Fixed: `tools/relink.sh` looked for a project only in the main repository. A project
   in a project repository (`~/.claude/claude-memory.d/<alias>`) stayed linked to the old
   clone. Now it looks in all repositories, and reports a project that it cannot find.
-- README.md, section 6.4, step 6: the procedure for each other machine after a migration.
+- README.md, section 9, step 6: the procedure for each other machine after a migration.
 - Nothing to do for the user.
 
 ## v0.3.3 - 2026-10-07
@@ -61,7 +73,7 @@ the user must do.
 - All memory repositories are equal. Each one has the tool, thus a repository can be the
   main repository of one person and a project repository of an other person. A person in
   a team can use the team repository as the main repository, without a private one
-  (README.md, section 4.7).
+  (README.md, section 2.2).
 - `sync.sh add-repo` puts the tool into a repository that has none. A repository keeps
   its own version of a file that the tool also has (for example `README.md`).
 - `sync.sh update` puts a new release also into your project repositories with an older
@@ -72,12 +84,12 @@ the user must do.
 
 ## v0.2.1 - 2026-10-07
 
-- New tools for the migration of an older memory (README.md, section 6.4):
+- New tools for the migration of an older memory (README.md, section 9):
   `tools/migrate.sh`, `tools/validate.sh`, `tools/local-candidates.sh`,
   `tools/relink.sh`.
 - `tools/validate.sh <memory repo>` checks a memory repository: index links, index
   lines, frontmatter, team memory.
-- Automatic tests in `tests/` (README.md, section 15).
+- Automatic tests in `tests/` (README.md, section 10).
 - `sync.sh` does not change. Nothing to do for the user.
 
 ## v0.2.0 - 2026-10-07
