@@ -109,6 +109,13 @@ HOME=$T/home sh "$SRC/tools/relink.sh" "$O" "$T/new" alice >/dev/null
 code=$?
 check "relink points the symlink to the new personal memory" [ "$(readlink "$T/home/.claude/projects/-src-app/memory")" = "$N/app/users/alice" ]
 check "relink finds a project in a project repository" [ "$(readlink "$T/home/.claude/projects/-src-web/memory")" = "$T/home/.claude/claude-memory.d/team/projects/web/users/alice" ]
+# A machine where the new repository is at the path of the old clone: the old symlink
+# points to the project directory of the new repository.
+mkdir -p "$T/home/.claude/projects/-src-same"
+ln -s "$N/app" "$T/home/.claude/projects/-src-same/memory"
+HOME=$T/home sh "$SRC/tools/relink.sh" "$T/elsewhere" "$T/new" alice >/dev/null
+check "relink fixes a symlink to the project directory of the new repository" [ "$(readlink "$T/home/.claude/projects/-src-same/memory")" = "$N/app/users/alice" ]
+check "relink does not change a symlink that is correct" [ "$(readlink "$T/home/.claude/projects/-src-app/memory")" = "$N/app/users/alice" ]
 check "relink leaves an unknown project and reports it" sh -c '[ "$1" = 1 ] && [ "$(readlink "$2")" = "$3" ]' x "$code" "$T/home/.claude/projects/-src-gone/memory" "$O/projects/gone"
 
 finish

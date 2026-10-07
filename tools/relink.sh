@@ -4,7 +4,9 @@
 #
 # Usage: tools/relink.sh <old repo path> <new main repo path> <user>
 #
-# Each symlink ~/.claude/projects/*/memory -> <old repo path>/projects/<name> becomes a
+# Each symlink ~/.claude/projects/*/memory -> <old repo path>/projects/<name> or
+# -> <new main repo path>/projects/<name> (the old symlink after the clone of the new
+# repository at the same path) becomes a
 # symlink to <repo>/projects/<name>/users/<user>, where <repo> is the new main repository
 # or a project repository in ~/.claude/claude-memory.d/ (CLAUDE_MEMORY_EXTRA) that has
 # the project. Run "sync.sh pull < /dev/null" first: it clones the project repositories.
@@ -17,12 +19,18 @@ bad=0
 for m in "$HOME"/.claude/projects/*/memory; do
   [ -L "$m" ] || continue
   t=$(readlink "$m")
+  t=${t%/}
+  # The symlinks are absolute. After "mv <new> <old>" and a clone of the new repository
+  # at the same path, a symlink of the old layout points to <new>/projects/<name>: the
+  # project directory of the new repository, not the personal memory in it.
   case $t in
-    "$OLD/projects/"*) ;;
+    "$OLD/projects/"*) name=${t#"$OLD/projects/"} ;;
+    "$NEW/projects/"*) name=${t#"$NEW/projects/"} ;;
     *) continue ;;
   esac
-  name=${t#"$OLD/projects/"}
-  name=${name%/}
+  case $name in
+    */*) continue ;;
+  esac
   new=""
   for r in "$NEW" "$EXTRA"/*; do
     if [ -d "$r/projects/$name/users/$ME" ]; then

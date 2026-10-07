@@ -4,6 +4,14 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.6 - 2026-10-07
+
+- Fixed: `tools/relink.sh` did not change the memory symlinks on a second machine after
+  a migration. The symlinks are absolute: after the rename of the old clone and the clone
+  of the new repository at the same path, they point to the project directory of the new
+  repository, not to the old clone. Now `relink.sh` also changes these symlinks.
+- Nothing to do for the user.
+
 ## v0.3.5 - 2026-10-07
 
 - Fixed: the release v0.3.4 has the wrong `VERSION` (0.3.3). Use v0.3.5. The content of
