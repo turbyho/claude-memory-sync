@@ -4,6 +4,13 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.9 - 2026-10-07
+
+- README.md, SKILL.md and the tests use invented examples: the projects `recipe-book`
+  (private) and `web-shop` (work), facts about pnpm and a local database, the personal
+  shared topic `photo-archive`.
+- Nothing to do for the user.
+
 ## v0.3.8 - 2026-10-07
 
 - README.md: clearer examples. The work repository on the git server is

@@ -123,15 +123,15 @@ Use `templates/record.md` of this skill. The frontmatter has these fields:
 
 ```markdown
 ---
-name: build-needs-ninja
-description: The build fails with make; use ninja (cmake -G Ninja)
+name: use-pnpm
+description: The project uses pnpm; npm breaks the lock file
 metadata:
   type: project                 # user | feedback | project | reference
   status: tentative             # tentative | confirmed | invalid
   role: personal                # team | personal | local
   created: 2026-10-07
   source: code                  # user | code | command | docs | session
-  evidence: CMakeLists.txt:12 requires the Ninja generator
+  evidence: package.json:5 sets "packageManager": "pnpm@9"
   history:
     - 2026-10-07 alice@laptop created
 ---
@@ -142,7 +142,7 @@ Fields for an invalid record, in addition:
 ```markdown
   invalidated: 2026-10-20
   reason: outdated              # false | outdated
-  superseded_by: build-uses-make
+  superseded_by: use-npm
 ```
 
 Claude Code adds the field `modified` itself. Do not write it.
@@ -260,7 +260,7 @@ Blockers. Do not promote a record when one of these applies:
 When you use a record in your work and you see that it is correct, add a history line:
 
 ```
-2026-10-09 alice@workstation verified: the build with ninja passed
+2026-10-09 alice@workstation verified: pnpm install passed
 ```
 
 Add a maximum of one `verified` line for each record for each day. These lines are
@@ -292,7 +292,7 @@ statement of the user. An assumption is not sufficient.
 5. Remove the old index line. Add a line to `invalid/INDEX.md`:
 
    ```
-   - [Build needs ninja](build-needs-ninja.md) - NOT TRUE since 2026-10: make works again, see [[build-uses-make]]
+   - [Use pnpm](use-pnpm.md) - NOT TRUE since 2026-10: the project uses npm again, see [[use-npm]]
    ```
 
 6. Find the links `[[<name>]]` to the record in the other records. Change them to the new
@@ -340,7 +340,7 @@ A group is a subdirectory with related records and its own index:
 
 ```
 <memory>/build/INDEX.md          # one line for each record of the group, with its state
-<memory>/build/ninja-setup.md
+<memory>/build/pnpm-setup.md
 <memory>/build/ci-cache.md
 ```
 
@@ -352,7 +352,7 @@ A group is a subdirectory with related records and its own index:
 4. In `MEMORY.md`, replace the lines of these records with one line in `## Groups`:
 
    ```
-   - [Build](build/INDEX.md) - ninja, cmake presets, CI cache, cross-compile toolchain
+   - [Build](build/INDEX.md) - pnpm, vite config, CI cache, docker images
    ```
 
 ## 11. Shared topics

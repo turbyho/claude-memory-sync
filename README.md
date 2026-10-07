@@ -55,7 +55,7 @@ the absolute path of the project.
 |---|---|
 | The memory is on one machine only. On your laptop, Claude does not know what it learned on your workstation. | A git repository that hooks sync at each session. |
 | The directory name comes from the path, and the path is different on each machine (`/Users/alice/work/app`, `/home/alice/src/app`). A file sync tool cannot join the two memories. | The project name comes from the git remote of the project, not from the path. |
-| Some notes are correct on one machine only, for example the path of a toolchain. | A local memory for each machine. |
+| Some notes are correct on one machine only, for example the port of a local database. | A local memory for each machine. |
 | Your colleagues learn the same project traps again. | A team memory for each project. |
 | A fact for two projects is written two times, and the copies become different. | Shared topics. |
 | Claude writes a conclusion at once, and all later sessions use it as true. | Records start as tentative. A review confirms them, or moves them to the invalid records. |
@@ -74,14 +74,14 @@ her team:
 ~/.claude/claude-memory/                   MAIN REPOSITORY of alice (git: alice/claude-memory)
 │                                          It also holds the tool: sync.sh, skills/, tools/
 ├── projects/
-│   └── home-heating/                      PROJECT (name from the git remote of the project)
+│   └── recipe-book/                       PROJECT (name from the git remote of the project)
 │       ├── team/                          TEAM MEMORY: all persons of this repository
-│       │   ├── pump-modbus-map.md
+│       │   ├── api-rate-limits.md
 │       │   └── invalid/                   known false team records
 │       └── users/
 │           └── alice/                     PERSONAL MEMORY of alice, on all her machines
 │               ├── MEMORY.md              index, loaded at session start
-│               ├── build-with-ninja.md
+│               ├── use-pnpm.md
 │               ├── invalid/               known false personal records
 │               └── hosts/
 │                   ├── laptop/            LOCAL MEMORY: only the machine "laptop"
@@ -92,12 +92,12 @@ her team:
     └── alice/
         ├── repos.conf                     the other repositories of alice
         └── shared/
-            └── nas/                       PERSONAL SHARED TOPIC of alice
+            └── photo-archive/             PERSONAL SHARED TOPIC of alice
 
 ~/.claude/claude-memory.d/
 └── work/                                  PROJECT REPOSITORY, alias "work" (git: team/work-claude-memory)
     ├── projects/
-    │   └── example-app/                   a work project, same structure as above
+    │   └── web-shop/                      a work project, same structure as above
     │       ├── team/
     │       └── users/alice/ ...
     └── shared/ ...
@@ -107,7 +107,7 @@ On each machine, the memory directory of Claude Code for a project is a symlink 
 personal memory of the person:
 
 ```
-~/.claude/projects/-Users-alice-home-heating/memory  ->  ~/.claude/claude-memory/projects/home-heating/users/alice
+~/.claude/projects/-Users-alice-projects-recipe-book/memory  ->  ~/.claude/claude-memory/projects/recipe-book/users/alice
 ```
 
 ### 2.2 Repositories: main and project repositories
@@ -157,7 +157,7 @@ A fact that more than one project uses goes into a shared topic, not into each p
 | Type | Location | For | Check of the team rules |
 |---|---|---|---|
 | Team shared topic | `shared/<topic>/` | Facts that are correct for all persons, for example the access to a test server | Yes |
-| Personal shared topic | `users/<user>/shared/<topic>/` | Your facts for some of your projects, for example the access to your NAS | No |
+| Personal shared topic | `users/<user>/shared/<topic>/` | Your facts for some of your projects, for example the access to your photo archive server | No |
 
 - A shared topic links only projects of the same repository.
 - `MEMORY.md` of each project that uses the topic has one line for the topic in
@@ -190,7 +190,7 @@ new fact --> tentative --(review: verified, or confirmed by you)--> confirmed
 
 | Name | Source | Command |
 |---|---|---|
-| Project | The name of the git remote `origin` of the project (`git@...:team/example-app.git` gives `example-app`). Without a remote: the directory name. The home directory: `_home`. | `sync.sh status` |
+| Project | The name of the git remote `origin` of the project (`git@...:team/web-shop.git` gives `web-shop`). Without a remote: the directory name. The home directory: `_home`. | `sync.sh status` |
 | Person | The part before `@` of `git config user.email` in the main repository. Env var `CLAUDE_MEMORY_USER` overrides it. It must be the same on all your machines. | `sync.sh user` |
 | Machine | `scutil --get LocalHostName` on macOS, `hostname -s` on Linux. Env var `CLAUDE_MEMORY_HOST` overrides it. | `sync.sh host` |
 
@@ -241,7 +241,7 @@ Clone it to a temporary directory, read its INSTALL.md, and do the procedure.
 
 My main memory repository is git@git.example.com:alice/claude-memory.git.
 It is a private repository.
-Enable the memory for these projects: ~/work/example-app, ~/home-heating.
+Enable the memory for these projects: ~/projects/recipe-book.
 ```
 
 **An other machine of the same person:** the same prompt, without the list of projects.
@@ -252,7 +252,7 @@ Your projects are enabled already.
 ```text
 Then add the work repository git@git.example.com:team/work-claude-memory.git as a
 project repository with the alias "work", and enable these projects in it:
-~/work/example-app.
+~/work/web-shop.
 ```
 
 **A team member who uses the team repository as main repository (setup D):** give the
@@ -304,10 +304,10 @@ team repository as the main memory repository in the first prompt.
 
 | Task | Command |
 |---|---|
-| Enable a project in the main repository | `sync.sh enable ~/work/example-app` |
+| Enable a project in the main repository | `sync.sh enable ~/projects/recipe-book` |
 | Enable the memory of the home directory | `sync.sh enable ~` |
 | Add a project repository with the alias `work` | `sync.sh add-repo work git@git.example.com:team/work-claude-memory.git` |
-| Enable a project in a project repository | `sync.sh enable ~/work/example-app --repo work` |
+| Enable a project in a project repository | `sync.sh enable ~/work/web-shop --repo work` |
 
 `sync.sh` is `~/.claude/claude-memory/sync.sh`. An enabled project and an added
 repository go to all your machines: they link and clone them at their next session.
@@ -332,15 +332,15 @@ You can give these prompts in any language:
 
 | Task | Prompt |
 |---|---|
-| Save a fact | "Remember: the build needs ninja." |
-| Save for this machine | "Remember for this machine: the debug probe is on /dev/ttyACM0." |
+| Save a fact | "Remember: this project uses pnpm, not npm." |
+| Save for this machine | "Remember for this machine: the local database listens on port 5433." |
 | Team memory | "Save to the team memory: the integration tests need the docker service." |
 | Show the memory | "What is in your memory about this project, and where does it come from?" |
 | Review | "Review the tentative memory records." |
-| Confirm a record | "The record about the build with ninja is correct. Promote it." |
-| Invalidate a record | "The record about the build with ninja is not correct any more: make works again. Invalidate it." |
+| Confirm a record | "The record about pnpm is correct. Promote it." |
+| Invalidate a record | "The record about pnpm is not correct any more: the project uses npm again. Invalidate it." |
 | Check a claim | "Is the claim that the API needs a token in the invalid memory records?" |
-| Shared topic | "Make a personal shared topic `nas` for my projects that use the NAS, and move the NAS records into it." |
+| Shared topic | "Make a personal shared topic `photo-archive` for my projects that use the photo archive, and move its records into it." |
 | Enable a project | "Enable the memory for this project." |
 | Other repository | "Add the memory repository git@git.example.com:team/work-claude-memory.git with the alias `work`, and move this project to it." |
 | Renamed repository | "The repository with the alias `work` is now git@git.example.com:team/team-claude-memory.git. Rename the alias to `team`." |
@@ -505,17 +505,17 @@ next `push` sends the changes.
 
 ```markdown
 ---
-name: build-with-ninja
-description: The build needs ninja (cmake -G Ninja)
+name: use-pnpm
+description: The project uses pnpm; npm breaks the lock file
 metadata:
   type: project                 # user | feedback | project | reference
   status: confirmed             # tentative | confirmed | invalid
   role: personal                # team | personal | local
   source: code                  # user | code | command | docs | session
-  evidence: CMakeLists.txt:12
+  evidence: package.json:5 sets "packageManager": "pnpm@9"
   history:
     - 2026-10-07 alice@laptop created
-    - 2026-10-21 alice@workstation promoted: verified against CMakeLists.txt:12
+    - 2026-10-21 alice@workstation promoted: verified against package.json:5
 ---
 The fact.
 ```

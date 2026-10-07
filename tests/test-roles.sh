@@ -38,18 +38,18 @@ check "b1 sees the team memory" contains "$out" "Team memory of this project"
 
 # Team records, a forbidden pattern, local memory.
 TD=$T/a1/.claude/claude-memory/projects/example-app/team
-printf -- '---\nname: ninja\ndescription: The build needs ninja\nmetadata:\n  status: confirmed\n---\nx\n' > "$TD/ninja.md"
-printf -- '---\nname: tc\ndescription: toolchain\n---\nIn /home/alice/gcc\n' > "$TD/tc.md"
+printf -- '---\nname: pnpm\ndescription: The project uses pnpm\nmetadata:\n  status: confirmed\n---\nx\n' > "$TD/pnpm.md"
+printf -- '---\nname: node\ndescription: node path\n---\nIn /home/alice/.local/node\n' > "$TD/node.md"
 mkdir -p "$M1/hosts/a1"
-printf '# Local\n\n## Confirmed\n- [Probe](probe.md) - probe on /dev/ttyACM0\n' > "$M1/hosts/a1/INDEX.md"
+printf '# Local\n\n## Confirmed\n- [Database](database.md) - local database on port 5433\n' > "$M1/hosts/a1/INDEX.md"
 run a1 push
 committed=$(git -C "$T/mem.git" log --name-only --format= -1)
-check "a good team record is committed" contains "$committed" "team/ninja.md"
-check "a team record with a forbidden pattern is not committed" sh -c "! printf '%s' \"\$1\" | grep -q team/tc.md" x "$committed"
+check "a good team record is committed" contains "$committed" "team/pnpm.md"
+check "a team record with a forbidden pattern is not committed" sh -c "! printf '%s' \"\$1\" | grep -q team/node.md" x "$committed"
 out=$(hook a1 app)
-check "pull warns about the team file" contains "$out" "team/tc.md:5"
-check "pull gives the local index" contains "$out" "probe on /dev/ttyACM0"
-check "pull gives the team index" contains "$out" "[ninja](ninja.md) - The build needs ninja"
+check "pull warns about the team file" contains "$out" "team/node.md:5"
+check "pull gives the local index" contains "$out" "local database on port 5433"
+check "pull gives the team index" contains "$out" "[pnpm](pnpm.md) - The project uses pnpm"
 
 run b1 enable "$T/b1/src/app" >/dev/null
 check "list shows the two persons" contains "$(run b1 list)" "example-app [main]: alice bob"
