@@ -18,6 +18,9 @@ description: `~/.claude/claude-memory/README.md`. Full procedure: skill
   synced. If the user asks to enable it, run
   `~/.claude/claude-memory/sync.sh enable <project-dir>`.
 - The SessionStart hook gives you the index of the local memory and of the team memory.
+- A line in `## Groups` of `MEMORY.md` can link to a shared topic for more than one
+  project: `~/.claude/claude-memory/shared/<topic>/` (team) or
+  `~/.claude/claude-memory/users/<user>/shared/<topic>/` (personal).
 - `<user>` is the output of `~/.claude/claude-memory/sync.sh user`, `<host>` the output
   of `~/.claude/claude-memory/sync.sh host`.
 - All persons with access to the repository can read all roles. Do not write private

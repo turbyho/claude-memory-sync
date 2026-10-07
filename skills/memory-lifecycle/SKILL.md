@@ -325,19 +325,31 @@ A group is a subdirectory with related records and its own index:
 
 ## 11. Shared topics
 
-A shared topic `~/.claude/claude-memory/shared/<topic>/` holds facts that more than one
-project uses, for example the access to a test server. It is team memory: all persons
-see it, and the rules of section 12 apply.
+A shared topic holds facts that more than one project uses, for example the access to a
+test server. There are two types:
 
-- `shared/<topic>/README.md` gives the rules of the topic and the list of the projects
-  that use it.
+| Type | Location | Rules |
+|---|---|---|
+| Team shared topic | `~/.claude/claude-memory/shared/<topic>/` | Team memory: section 12 applies, the PreToolUse hook checks it. |
+| Personal shared topic | `~/.claude/claude-memory/users/<user>/shared/<topic>/` | Personal memory of one person, for more than one project of the person. No check of patterns. |
+
+Use a personal shared topic for the facts of one person (for example, the access of the
+user to a home server, with paths of the user). Use a team shared topic for facts that
+are correct for all persons.
+
+The two types have the same structure:
+
+- `<topic>/README.md` gives the rules of the topic and the list of the projects that use
+  it.
 - The topic has no index file. To see its records, search with Grep for `^description:`
   in the topic directory.
-- Its invalid records go to `shared/<topic>/invalid/`.
-- `MEMORY.md` of each project that uses the topic has one line in `## Groups`:
+- Its invalid records go to `<topic>/invalid/`.
+- `MEMORY.md` of each project that uses the topic has one line in `## Groups`. Below it,
+  it can have one indented line for each record:
 
   ```
   - [Test server](~/.claude/claude-memory/shared/test-server/) - shared: SSH access, database schema
+    - [SSH access](~/.claude/claude-memory/shared/test-server/ssh-access.md) - user, key, jump host
   ```
 
 - Do not make a symlink to a shared topic. The repository contains no symlinks, because

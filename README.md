@@ -210,7 +210,8 @@ Git syncs the repository between all machines and all persons.
 | `projects/<name>/users/<user>/` | Personal memory of one person (section 5.2). `MEMORY.md` is the index. |
 | `projects/<name>/users/<user>/hosts/<host>/` | Local memory of one machine (section 5.3). |
 | `projects/_home/` | Memory of the sessions that start in the home directory. |
-| `shared/<topic>/` | Shared topics (section 9). |
+| `shared/<topic>/` | Team shared topics (section 9). |
+| `users/<user>/shared/<topic>/` | Personal shared topics (section 9.1). |
 | `CLAUDE-MEMORY.md` | Instructions for Claude. You import them into `~/.claude/CLAUDE.md`. |
 | `skills/memory-lifecycle/` | Skill for Claude: roles and lifecycle (sections 5 and 10), with templates. |
 | `team-memory-check.default` | Forbidden patterns in the team memory (section 5.1). |
@@ -539,6 +540,17 @@ it, and the rules of section 5.1 apply.
 
 The repository contains no symlinks. The link is a path in `MEMORY.md`, thus it operates
 on each system, also where git cannot make symlinks.
+
+### 9.1 Personal shared topics
+
+Some facts are personal, but more than one of your projects uses them, for example your
+access to a home server, with paths in your home directory. Put them into a personal
+shared topic: `users/<user>/shared/<topic>/`. The structure is the same, but the check of
+the team memory does not apply. The link in `MEMORY.md`:
+
+```
+- [Home server](~/.claude/claude-memory/users/alice/shared/home-server/) - personal shared topic: SSH, backups
+```
 
 ## 10. Memory lifecycle
 
