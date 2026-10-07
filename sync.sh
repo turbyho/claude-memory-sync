@@ -20,6 +20,11 @@
 #   sync.sh list             Show the projects and the persons that use them.
 #   sync.sh user             Show the name of this person, as the memory uses it.
 #   sync.sh host             Show the name of this machine, as the memory uses it.
+#   sync.sh setup            Set up this machine: hooks, instructions, skill. Idempotent.
+#   sync.sh update           Merge the latest release of claude-memory-sync from the remote
+#                            "upstream", push it, then run setup.
+#   sync.sh version          Show the version of the repository, of the latest release and
+#                            of the setup of this machine.
 #
 # The default dir is the current directory.
 # The script ignores network errors. Without the server, Claude uses the local copy.
@@ -30,7 +35,13 @@ BACKUP="$HOME/.claude/memory-backup"
 TEMPLATES="$REPO/skills/memory-lifecycle/templates"
 LOCAL_LINES=100
 TEAM_LINES=150
+# Version of the machine setup (hooks, instructions, skill) that this sync.sh needs.
+# Increase it when a release changes the setup. "sync.sh setup" writes it to SETUP_FILE.
+SETUP_VERSION=1
+SETUP_FILE="$HOME/.claude/claude-memory-setup"
 export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -o ConnectTimeout=5 -o BatchMode=yes}"
+export GIT_HTTP_LOW_SPEED_LIMIT=${GIT_HTTP_LOW_SPEED_LIMIT:-1000}
+export GIT_HTTP_LOW_SPEED_TIME=${GIT_HTTP_LOW_SPEED_TIME:-5}
 
 # Make a name safe for a directory: lower case, other characters than a-z 0-9 . _ - become
 # "-".
@@ -325,9 +336,187 @@ push() {
     git commit -q -m "${1:-Update memory from $ME@$HOST}" >/dev/null 2>&1
   fi
   if ! git rev-parse -q --verify '@{u}' >/dev/null 2>&1 || [ -n "$(git log '@{u}..' --oneline 2>/dev/null)" ]; then
-    git pull -q --rebase --autostash >/dev/null 2>&1
+    git pull -q --rebase=merges --autostash >/dev/null 2>&1
     git push -q -u origin HEAD >/dev/null 2>&1
   fi
+}
+
+# Version of the tool in the repository. A repository without VERSION is older than the
+# first release.
+repo_version() {
+  v=$(cat "$REPO/VERSION" 2>/dev/null)
+  echo "${v:-0.0.0}"
+}
+
+# Is version $1 greater than version $2? Versions are X.Y.Z.
+ver_gt() {
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    n = split(a, x, "."); m = split(b, y, ".")
+    for (i = 1; i <= 3; i++) {
+      if (x[i] + 0 > y[i] + 0) exit 0
+      if (x[i] + 0 < y[i] + 0) exit 1
+    }
+    exit 1
+  }'
+}
+
+# The latest release tag (vX.Y.Z) that git knows.
+latest_tag() {
+  git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -n 1
+}
+
+# Get the release tags from the remote "upstream", at most one time in 24 hours.
+fetch_releases() {
+  git remote get-url upstream >/dev/null 2>&1 || return 0
+  stamp="$(git rev-parse --git-dir 2>/dev/null)/claude-memory-sync-fetch"
+  [ -n "$(find "$stamp" -mmin -1440 2>/dev/null)" ] && return 0
+  git fetch -q --tags upstream >/dev/null 2>&1 && touch "$stamp"
+}
+
+# Write a notice to stdout if a newer release exists, or if the setup of this machine is
+# older than this sync.sh needs. The SessionStart hook gives the text to Claude.
+update_notice() {
+  cur=$(repo_version)
+  new=$(latest_tag)
+  if [ -n "$new" ] && ver_gt "${new#v}" "$cur"; then
+    echo "UPDATE: claude-memory-sync $new is available. This repository has v$cur."
+    echo "Tell the user, then do the update. The update instructions of $new are in:"
+    echo "  git -C $REPO show $new:UPDATE.md"
+    echo
+  fi
+  have=$(cat "$SETUP_FILE" 2>/dev/null)
+  if [ "${have:-0}" -lt "$SETUP_VERSION" ] 2>/dev/null; then
+    echo "SETUP: the setup of this machine has version ${have:-0}, claude-memory-sync needs"
+    echo "version $SETUP_VERSION. Tell the user, then run: $REPO/sync.sh setup"
+    echo "Instructions: $REPO/UPDATE.md, section \"Setup of a machine\"."
+    echo
+  fi
+}
+
+# Path of sync.sh for the hook commands: with "~" if the repository is in the home
+# directory.
+hook_path() {
+  case $REPO in
+    "$HOME"/*) echo "~${REPO#"$HOME"}/sync.sh" ;;
+    *) echo "$REPO/sync.sh" ;;
+  esac
+}
+
+# Set up this machine: hooks in settings.json, import line in CLAUDE.md, skill symlink.
+# Each step changes nothing if it is done already.
+setup() {
+  s="$HOME/.claude/settings.json"
+  sh_path=$(hook_path)
+  mkdir -p "$HOME/.claude"
+  [ -f "$s" ] || echo '{}' > "$s"
+  missing=""
+  for c in pull push check-team; do
+    grep -q "sync.sh $c\"" "$s" || missing="$missing $c"
+  done
+  if [ -n "$missing" ]; then
+    b="$s.bak.$(date +%Y%m%d%H%M%S)"
+    cp "$s" "$b"
+    if command -v jq >/dev/null 2>&1; then
+      prog="."
+      for c in $missing; do
+        case $c in
+          pull) prog="$prog | .hooks.SessionStart += [{\"hooks\":[{\"type\":\"command\",\"command\":\"$sh_path pull\",\"timeout\":20}]}]" ;;
+          push) prog="$prog | .hooks.Stop += [{\"hooks\":[{\"type\":\"command\",\"command\":\"$sh_path push\",\"timeout\":30,\"async\":true}]}]" ;;
+          check-team) prog="$prog | .hooks.PreToolUse += [{\"matcher\":\"Write|Edit|MultiEdit\",\"hooks\":[{\"type\":\"command\",\"command\":\"$sh_path check-team\",\"timeout\":10}]}]" ;;
+        esac
+      done
+      jq "$prog" "$b" > "$s.new"
+    elif command -v python3 >/dev/null 2>&1; then
+      python3 - "$b" "$s.new" "$sh_path" $missing <<'PY'
+import json, sys
+src, dst, path, missing = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
+d = json.load(open(src))
+h = d.setdefault("hooks", {})
+spec = {
+    "pull": ("SessionStart", {"hooks": [{"type": "command", "command": path + " pull", "timeout": 20}]}),
+    "push": ("Stop", {"hooks": [{"type": "command", "command": path + " push", "timeout": 30, "async": True}]}),
+    "check-team": ("PreToolUse", {"matcher": "Write|Edit|MultiEdit", "hooks": [{"type": "command", "command": path + " check-team", "timeout": 10}]}),
+}
+for m in missing:
+    ev, entry = spec[m]
+    h.setdefault(ev, []).append(entry)
+json.dump(d, open(dst, "w"), indent=2)
+PY
+    else
+      echo "sync.sh setup: jq or python3 is necessary to change $s." >&2
+      return 1
+    fi
+    if [ -s "$s.new" ] && { ! command -v jq >/dev/null 2>&1 || jq empty "$s.new" 2>/dev/null; }; then
+      mv "$s.new" "$s"
+      echo "Hooks added:$missing (backup: $b)"
+    else
+      rm -f "$s.new"
+      echo "sync.sh setup: the new settings.json is not valid. Nothing changed." >&2
+      return 1
+    fi
+  else
+    echo "Hooks: present"
+  fi
+
+  imp="@$(dirname "$sh_path")/CLAUDE-MEMORY.md"
+  cm="$HOME/.claude/CLAUDE.md"
+  if [ -f "$cm" ] && grep -q -F -x "$imp" "$cm"; then
+    echo "Instructions: present"
+  else
+    [ -f "$cm" ] && cp "$cm" "$cm.bak.$(date +%Y%m%d%H%M%S)"
+    printf '\n%s\n' "$imp" >> "$cm"
+    echo "Instructions: import line added to $cm"
+  fi
+
+  sk="$HOME/.claude/skills/memory-lifecycle"
+  if [ -L "$sk" ] && [ "$(readlink "$sk")" = "$REPO/skills/memory-lifecycle" ]; then
+    echo "Skill: present"
+  elif [ -e "$sk" ] || [ -L "$sk" ]; then
+    echo "Skill: $sk exists and is not the symlink to $REPO/skills/memory-lifecycle. Not changed." >&2
+  else
+    mkdir -p "$HOME/.claude/skills"
+    ln -s "$REPO/skills/memory-lifecycle" "$sk"
+    echo "Skill: symlink made"
+  fi
+
+  echo "$SETUP_VERSION" > "$SETUP_FILE"
+  echo "Setup version: $SETUP_VERSION"
+}
+
+# Merge the latest release from "upstream". Stop at a conflict, without a change.
+update() {
+  if ! git remote get-url upstream >/dev/null 2>&1; then
+    echo "sync.sh update: no remote \"upstream\". Add it: git -C $REPO remote add upstream <URL of claude-memory-sync>" >&2
+    return 1
+  fi
+  wait_for_lock
+  push "Update memory from $ME@$HOST"
+  git pull -q --rebase=merges --autostash >/dev/null 2>&1
+  if ! git fetch -q --tags upstream; then
+    echo "sync.sh update: cannot get the releases from upstream." >&2
+    return 1
+  fi
+  touch "$(git rev-parse --git-dir)/claude-memory-sync-fetch"
+  cur=$(repo_version)
+  new=$(latest_tag)
+  if [ -z "$new" ] || ! ver_gt "${new#v}" "$cur"; then
+    echo "Up to date: v$cur"
+    return 0
+  fi
+  echo "Update: v$cur -> $new"
+  echo "Changes (CHANGELOG.md):"
+  git diff HEAD "$new" -- CHANGELOG.md | sed -n 's/^+\([^+]\)/  \1/p; s/^+$//p'
+  if ! git merge -q --no-edit -m "Update claude-memory-sync to $new" "$new" >/dev/null 2>&1; then
+    files=$(git diff --name-only --diff-filter=U)
+    git merge --abort >/dev/null 2>&1
+    echo "CONFLICT: the merge of $new stopped. Nothing changed. Files:" >&2
+    echo "$files" | sed 's/^/  /' >&2
+    echo "See $REPO/UPDATE.md, section \"Conflicts\"." >&2
+    return 1
+  fi
+  push
+  echo "Merged and pushed: $new"
+  "$REPO/sync.sh" setup
 }
 
 # Set dir, name, mem, pdir (the project) and udir (the personal memory) from a directory.
@@ -358,8 +547,10 @@ case "$1" in
   pull)
     dir=$(read_cwd)
     wait_for_lock
-    git pull -q --rebase --autostash >/dev/null 2>&1
+    git pull -q --rebase=merges --autostash >/dev/null 2>&1
+    fetch_releases
     conflict_warning
+    update_notice
     lint_warning
     [ -n "$dir" ] && [ -d "$dir" ] || exit 0
     target "$dir"
@@ -477,8 +668,19 @@ case "$1" in
   host)
     echo "$HOST"
     ;;
+  setup)
+    setup || exit 1
+    ;;
+  update)
+    update || exit 1
+    ;;
+  version)
+    echo "Repository:      v$(repo_version)"
+    echo "Latest release:  $(latest_tag) (from the remote \"upstream\", fetched by pull and update)"
+    echo "Machine setup:   $(cat "$SETUP_FILE" 2>/dev/null || echo 0) (needed: $SETUP_VERSION)"
+    ;;
   *)
-    sed -n '2,26s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,32s/^# \{0,1\}//p' "$0" >&2
     exit 2
     ;;
 esac

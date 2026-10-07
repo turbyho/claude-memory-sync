@@ -80,9 +80,21 @@ record always stays in the project.
 
 - The hook `SessionStart` runs `sync.sh pull`. The hook `Stop` runs `sync.sh push` after
   each reply. Do not commit or push this repository yourself. Exceptions: the user tells
-  you to, or a conflict makes it necessary.
+  you to, a conflict makes it necessary, or you do an update (section "Updates").
 - If the SessionStart hook shows a WARNING (rebase conflict, team file not committed),
   tell the user.
 - A file `<file>.<host>.md` next to a memory file is a version from a different machine
   that `sync.sh` could not merge. When you work on that topic, merge it into the primary
   file, delete it, and tell the user.
+
+### Updates of claude-memory-sync
+
+- If the SessionStart hook shows `UPDATE: claude-memory-sync vX.Y.Z is available`, do
+  the update. The instructions are in `UPDATE.md` of the new version. The notice gives
+  the command that shows them: `git -C ~/.claude/claude-memory show vX.Y.Z:UPDATE.md`.
+  Read them first, then follow them.
+- If the SessionStart hook shows `SETUP: ...`, run `~/.claude/claude-memory/sync.sh
+  setup`, as `~/.claude/claude-memory/UPDATE.md`, section "Setup of a machine", tells.
+- If the user asks for an update of claude-memory-sync, run
+  `~/.claude/claude-memory/sync.sh version`. Then follow `UPDATE.md` of the latest
+  release.

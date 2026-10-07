@@ -96,7 +96,7 @@ You can ask Claude to do these tasks in any language. Some examples:
 | Who changed a record | "Show the history of the memory record about the build." |
 | History | "Show the changes to the memory of this project in the last week." |
 | Merge a conflict file | "Merge the `.<host>.md` files in the memory of this project." |
-| Update the script | "Update claude-memory-sync from upstream." |
+| Update the tool | "Update claude-memory-sync." |
 
 ## 3. The problem
 
@@ -218,6 +218,8 @@ Git syncs the repository between all machines and all persons.
 | `skills/memory-lifecycle/` | Skill for Claude: roles and lifecycle (sections 5 and 10), with templates. |
 | `team-memory-check.default` | Forbidden patterns in the team memory (section 5.1). |
 | `sync.sh` | Sync script (POSIX sh). The hooks call it. |
+| `VERSION`, `CHANGELOG.md` | Version of the tool and its changes (section 7.1). |
+| `UPDATE.md` | Instructions for Claude: update of the tool and setup of a machine. |
 
 ### 4.2 Project name
 
@@ -270,7 +272,7 @@ enable the project.
 
 | Hook | Command | What it does |
 |---|---|---|
-| `SessionStart` | `sync.sh pull` | Pulls the repository. Links the memory directory of the session if the project is enabled for you. Gives the index of the local memory and of the team memory to Claude. Shows warnings (rebase conflict, team file not committed). |
+| `SessionStart` | `sync.sh pull` | Pulls the repository. Links the memory directory of the session if the project is enabled for you. Gives the index of the local memory and of the team memory to Claude. Shows warnings (rebase conflict, team file not committed) and notices (new release, setup of the machine; section 7.1). |
 | `Stop` (async) | `sync.sh push` | After each reply: commits all changes ("Update memory from <user>@<host>") and pushes. A team file with a forbidden pattern stays out of the commit. |
 | `PreToolUse` (`Write`, `Edit`, `MultiEdit`) | `sync.sh check-team` | Blocks a write into the team memory that contains a forbidden pattern (section 5.1). |
 
@@ -387,6 +389,7 @@ Requirements:
    ```sh
    git clone https://git.montyho.com/turbyho/claude-memory-sync.git ~/.claude/claude-memory
    cd ~/.claude/claude-memory
+   git reset -q --hard "$(git tag -l 'v*' --sort=-v:refname | head -n 1)"   # latest release
    git remote rename origin upstream
    git remote add origin git@git.example.com:team/claude-memory.git
    git push -u origin main
@@ -409,8 +412,24 @@ Requirements:
 
 ### 6.3 Hooks, instructions and skill (each machine)
 
-1. Add the hooks to `~/.claude/settings.json`. If the file has a `hooks` key, merge them
-   into it, and keep the hooks that are there:
+1. Set up the machine:
+
+   ```sh
+   ~/.claude/claude-memory/sync.sh setup
+   ```
+
+   The command does these steps. Each step changes nothing if it is done already:
+
+   - Adds the three hooks to `~/.claude/settings.json`. It makes a backup first, and keeps
+     all other keys and hooks. It needs `jq` or `python3`.
+   - Adds the import line `@~/.claude/claude-memory/CLAUDE-MEMORY.md` to
+     `~/.claude/CLAUDE.md`. Claude Code loads the instructions at the start of each
+     session.
+   - Makes the symlink `~/.claude/skills/memory-lifecycle`. Thus `git pull` updates the
+     skill.
+   - Writes the setup version to `~/.claude/claude-memory-setup`.
+
+   For reference, the hooks that `setup` adds:
 
    ```json
    "hooks": {
@@ -430,37 +449,13 @@ Requirements:
    }
    ```
 
-   With `jq`, as one command (it makes a backup first):
-
-   ```sh
-   cd ~/.claude && cp settings.json settings.json.bak && jq '
-     .hooks.SessionStart += [{"hooks":[{"type":"command","command":"~/.claude/claude-memory/sync.sh pull","timeout":20}]}] |
-     .hooks.Stop += [{"hooks":[{"type":"command","command":"~/.claude/claude-memory/sync.sh push","timeout":30,"async":true}]}] |
-     .hooks.PreToolUse += [{"matcher":"Write|Edit|MultiEdit","hooks":[{"type":"command","command":"~/.claude/claude-memory/sync.sh check-team","timeout":10}]}]
-   ' settings.json.bak > settings.json
-   ```
-
-2. Give Claude the instructions. Add this line at the end of `~/.claude/CLAUDE.md`. If the
-   file does not exist, make it:
-
-   ```
-   @~/.claude/claude-memory/CLAUDE-MEMORY.md
-   ```
-
-3. Install the skill `memory-lifecycle` as a symlink. Thus `git pull` updates it:
-
-   ```sh
-   mkdir -p ~/.claude/skills
-   ln -s ~/.claude/claude-memory/skills/memory-lifecycle ~/.claude/skills/memory-lifecycle
-   ```
-
-4. Make sure that the person name is correct. It must be the same on all your machines:
+2. Make sure that the person name is correct. It must be the same on all your machines:
 
    ```sh
    ~/.claude/claude-memory/sync.sh user
    ```
 
-5. Enable the projects that you want to sync. Do this on one of your machines only:
+3. Enable the projects that you want to sync. Do this on one of your machines only:
 
    ```sh
    ~/.claude/claude-memory/sync.sh enable ~/work/example-app
@@ -469,9 +464,10 @@ Requirements:
 
    On your other machines, the script links the project at the next session in it.
 
-6. Do a check:
+4. Do a check:
 
    ```sh
+   ~/.claude/claude-memory/sync.sh version
    ~/.claude/claude-memory/sync.sh status ~/work/example-app
    git -C ~/.claude/claude-memory status -sb      # "## main...origin/main", no changes
    ```
@@ -480,9 +476,9 @@ Requirements:
 
 ### 6.4 Other location of the repository
 
-The script finds the repository from its own location. If you clone it to a different
-directory, change the path in the hooks, in the import line and in the skill symlink. As
-an alternative, set the env var `CLAUDE_MEMORY_REPO`.
+The script finds the repository from its own location, and `sync.sh setup` uses that
+location for the hooks, the import line and the skill symlink. As an alternative, set the
+env var `CLAUDE_MEMORY_REPO`.
 
 ## 7. Daily use
 
@@ -495,15 +491,57 @@ more. For the prompts, see section 2.
 - Undo a bad memory change: `git -C ~/.claude/claude-memory revert <commit>`. The next
   `push` sends it.
 - Sync by hand: `sync.sh pull < /dev/null` and `sync.sh push`.
-- Get a new version of the script:
+- Show the versions: `sync.sh version`
 
-  ```sh
-  cd ~/.claude/claude-memory && git pull upstream main && git push
-  ```
+### 7.1 Updates of the tool
 
-  The template does not contain files in `projects/` or `shared/`, thus the merge does not
-  touch the memory. If you changed the skill `memory-lifecycle` in your copy, the merge can
-  cause a conflict in `skills/`. Solve it as in section 11.
+The tool (`sync.sh`, `CLAUDE-MEMORY.md`, the skill, the templates) is in the memory
+repository. The remote `upstream` is this repository. A release is a git tag `vX.Y.Z`.
+
+1. One time in 24 hours, `sync.sh pull` gets the release tags from `upstream`. If a
+   release is newer than the `VERSION` of the memory repository, the SessionStart hook
+   tells Claude: `UPDATE: claude-memory-sync vX.Y.Z is available`. The notice gives the
+   command that shows `UPDATE.md` of the new release.
+2. Claude tells you, reads `UPDATE.md` of the new release, and does the update. The
+   instructions are in `CLAUDE-MEMORY.md`, section "Updates".
+3. `sync.sh update` merges the release tag into the memory repository, pushes it, and runs
+   `sync.sh setup` on this machine.
+4. The other machines and persons get the new version with their next `sync.sh pull`. If
+   the release changes the setup of a machine, their SessionStart hook shows `SETUP`, and
+   Claude runs `sync.sh setup` there.
+
+To update by hand: `~/.claude/claude-memory/sync.sh update`, or the prompt "Update
+claude-memory-sync."
+
+The template does not contain files in `projects/`, `users/` or `shared/`, thus an update
+does not touch the memory. If you changed a file of the tool in your copy (for example the
+skill), an update can cause a conflict. `sync.sh update` then stops and changes nothing.
+Claude shows you the two changes and asks how to merge them (`UPDATE.md`, section
+"Conflicts").
+
+> CAUTION: AN UPDATE RUNS NEW CODE FROM `upstream` ON ALL YOUR MACHINES. SET `upstream`
+> ONLY TO A REPOSITORY THAT YOU TRUST.
+
+### 7.2 Publish a new release (maintainers)
+
+Do these steps in the repository of the tool, not in a memory repository:
+
+1. Write the changes into `CHANGELOG.md`, in a new section `## vX.Y.Z - <date>`. Write
+   them for the user: what is new, what is different, what the user must do.
+2. Write the new version into `VERSION`.
+3. If the release changes the setup of a machine (hooks, import line, skill symlink),
+   change `setup()` in `sync.sh`, and increase `SETUP_VERSION`.
+4. If the update needs more steps (for example a change of the memory layout), add them
+   to `UPDATE.md`, section "Steps for each release".
+5. Commit, tag and push:
+
+   ```sh
+   git commit -am "Release vX.Y.Z"
+   git tag vX.Y.Z
+   git push origin main vX.Y.Z
+   ```
+
+The memory repositories find the release within 24 hours.
 
 ## 8. Disable a project
 
@@ -729,7 +767,8 @@ team record.
 
 2. Remove the three hooks from `~/.claude/settings.json`.
 3. Remove the import line from `~/.claude/CLAUDE.md`.
-4. Remove the symlink `~/.claude/skills/memory-lifecycle`.
+4. Remove the symlink `~/.claude/skills/memory-lifecycle` and the file
+   `~/.claude/claude-memory-setup`.
 
 You can keep or delete the clone `~/.claude/claude-memory`.
 
@@ -774,8 +813,8 @@ In this section:
    ```
 
    If the command fails, stop. Tell the user to set up an SSH key or an SSH agent.
-5. Find which tool can edit JSON: `jq`, else `python3`. If none is available, use your
-   file edit tool for step 14.5.
+5. Make sure that `jq` or `python3` is installed. `sync.sh setup` needs one of them to
+   change `~/.claude/settings.json`. If none is installed, stop and tell the user.
 6. Look at `REPO`:
    - It does not exist: continue with step 14.4.
    - It is a git clone with `origin` equal to `MEMORY`: skip step 14.4.
@@ -785,11 +824,13 @@ In this section:
 
 The output of `git ls-remote MEMORY` (step 14.3) tells you which case applies.
 
-If `MEMORY` is empty (no refs), this is the first person:
+If `MEMORY` is empty (no refs), this is the first person. Start from the latest release,
+not from the branch `main` of `TEMPLATE`:
 
 ```sh
 git clone TEMPLATE ~/.claude/claude-memory
 cd ~/.claude/claude-memory
+git reset -q --hard "$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
 git remote rename origin upstream
 git remote add origin MEMORY
 git push -u origin main
@@ -804,50 +845,21 @@ git -C ~/.claude/claude-memory remote add upstream TEMPLATE
 
 Make sure that `REPO/sync.sh` is executable.
 
-### 14.5 Add the hooks
+### 14.5 Set up the machine
 
-1. If `~/.claude/settings.json` does not exist, make it with the content `{}`.
-2. Find the hooks that are there already:
-
-   ```sh
-   jq '[.. | .command? // empty | select(test("claude-memory/sync.sh"))]' ~/.claude/settings.json
-   ```
-
-   If the three commands `sync.sh pull`, `sync.sh push` and `sync.sh check-team` are in
-   the output, skip this step. If only some are there, add only the missing hooks.
-3. Make a backup: `cp ~/.claude/settings.json ~/.claude/settings.json.bak.<time>`.
-4. Add the hooks. Keep all keys and hooks that are there:
+1. Run:
 
    ```sh
-   jq '
-     .hooks.SessionStart += [{"hooks":[{"type":"command","command":"~/.claude/claude-memory/sync.sh pull","timeout":20}]}] |
-     .hooks.Stop += [{"hooks":[{"type":"command","command":"~/.claude/claude-memory/sync.sh push","timeout":30,"async":true}]}] |
-     .hooks.PreToolUse += [{"matcher":"Write|Edit|MultiEdit","hooks":[{"type":"command","command":"~/.claude/claude-memory/sync.sh check-team","timeout":10}]}]
-   ' ~/.claude/settings.json.bak.<time> > ~/.claude/settings.json
+   ~/.claude/claude-memory/sync.sh setup
    ```
 
-5. Make sure that the result is valid JSON: `jq empty ~/.claude/settings.json`. If it is
-   not valid, restore the backup and stop.
+   It adds the hooks to `~/.claude/settings.json` (with a backup), the import line to
+   `~/.claude/CLAUDE.md` and the skill symlink. Each step changes nothing if it is done
+   already.
+2. If the command fails, or shows that it did not change a file because the file is in a
+   different state, stop. Tell the user the output. Do not change the file yourself.
 
-### 14.6 Add the instructions and the skill for Claude
-
-1. If `~/.claude/CLAUDE.md` contains the line `@~/.claude/claude-memory/CLAUDE-MEMORY.md`,
-   skip to step 4.
-2. If the file exists, make a backup.
-3. Add the line at the end of the file. Put an empty line before it. If the file does not
-   exist, make it.
-4. Look at `~/.claude/skills/memory-lifecycle`:
-   - It is a symlink to `REPO/skills/memory-lifecycle`: skip this step.
-   - It does not exist: make the symlink:
-
-     ```sh
-     mkdir -p ~/.claude/skills
-     ln -s ~/.claude/claude-memory/skills/memory-lifecycle ~/.claude/skills/memory-lifecycle
-     ```
-
-   - Other state: do not change it. Tell the user.
-
-### 14.7 Enable the projects
+### 14.6 Enable the projects
 
 1. Run `~/.claude/claude-memory/sync.sh user`. Tell the user the person name. If the user
    has other machines with the sync, the name must be the same there.
@@ -861,15 +873,17 @@ Make sure that `REPO/sync.sh` is executable.
       tell the user that the name comes from the directory name. The directory must have
       the same name on each machine and for each person.
 
-### 14.8 Do a check of the result
+### 14.7 Do a check of the result
 
-1. For each enabled project, run `~/.claude/claude-memory/sync.sh status <dir>`. The
+1. Run `~/.claude/claude-memory/sync.sh version`. The machine setup must be equal to the
+   needed setup.
+2. For each enabled project, run `~/.claude/claude-memory/sync.sh status <dir>`. The
    memory must be a symlink into `REPO/projects/<name>/users/<user>/`.
-2. Run `git -C ~/.claude/claude-memory status -sb`. The output must be
+3. Run `git -C ~/.claude/claude-memory status -sb`. The output must be
    `## main...origin/main` with no changes.
-3. Make sure that `~/.claude/skills/memory-lifecycle/SKILL.md` can be read.
+4. Make sure that `~/.claude/skills/memory-lifecycle/SKILL.md` can be read.
 
-### 14.9 Report to the user
+### 14.8 Report to the user
 
 Tell the user:
 
