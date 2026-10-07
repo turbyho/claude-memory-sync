@@ -26,6 +26,10 @@
 #                            Add a memory repository for some projects. Its clone is in
 #                            ~/.claude/claude-memory.d/<alias>; all your machines get it.
 #   sync.sh repos            Show the memory repositories and their projects.
+#   sync.sh rename-repo <old alias> <new alias> [<url>]
+#                            Rename the alias of a memory repository, and set its new URL
+#                            (for example after a rename on the git server). Your other
+#                            machines do the same at their next session.
 #   sync.sh move [dir] <alias>
 #                            Move the project (team and personal memory) to a different
 #                            memory repository. "main" is ~/.claude/claude-memory.
@@ -124,13 +128,46 @@ repo_of() {
 # The list of the other memory repositories of this person: users/<user>/repos.conf in
 # the main repository, one line "<alias> <url>" for each repository.
 REPOS_CONF="$REPO/users/$ME/repos.conf"
+# The renamed aliases: users/<user>/repos.renamed, one line "<old alias> <new alias>".
+REPOS_RENAMED="$REPO/users/$ME/repos.renamed"
 
-# Clone each repository of repos.conf that has no clone on this machine yet.
+# Rename the clone of alias $1 to alias $2, and point the memory symlinks of this
+# machine to the new place.
+move_clone() {
+  mv "$EXTRA/$1" "$EXTRA/$2"
+  for m in "$PROJECTS"/*/memory; do
+    [ -L "$m" ] || continue
+    t=$(readlink "$m")
+    case $t in
+      "$EXTRA/$1/"*)
+        rm "$m"
+        ln -s "$EXTRA/$2/${t#"$EXTRA/$1/"}" "$m"
+        ;;
+    esac
+  done
+}
+
+# Make the clones of this machine agree with repos.conf and repos.renamed: rename a clone
+# with an old alias, set the URL of a clone, and clone each missing repository.
 clone_missing() {
+  if [ -f "$REPOS_RENAMED" ]; then
+    sed '/^#/d;/^[[:space:]]*$/d' "$REPOS_RENAMED" | while read -r o n; do
+      [ -n "$o" ] && [ -n "$n" ] || continue
+      if [ -d "$EXTRA/$o/.git" ] && [ ! -e "$EXTRA/$n" ]; then
+        move_clone "$o" "$n"
+        echo "NOTICE: renamed the memory repository \"$o\" to \"$n\" on this machine."
+        echo
+      fi
+    done
+  fi
   [ -f "$REPOS_CONF" ] || return 0
   sed '/^#/d;/^[[:space:]]*$/d' "$REPOS_CONF" | while read -r a u; do
     [ -n "$a" ] && [ -n "$u" ] || continue
-    [ -d "$EXTRA/$a/.git" ] && continue
+    if [ -d "$EXTRA/$a/.git" ]; then
+      [ "$(git -C "$EXTRA/$a" remote get-url origin 2>/dev/null)" = "$u" ] ||
+        git -C "$EXTRA/$a" remote set-url origin "$u"
+      continue
+    fi
     mkdir -p "$EXTRA"
     if git clone -q "$u" "$EXTRA/$a" >/dev/null 2>&1; then
       echo "NOTICE: cloned the memory repository \"$a\" to $EXTRA/$a."
@@ -904,6 +941,51 @@ case "$1" in
     echo "  Your other machines clone it at their next session."
     echo "  Enable a project in it: sync.sh enable <dir> --repo $a"
     ;;
+  rename-repo)
+    o=$2
+    n=$3
+    u=$4
+    if [ -z "$o" ] || [ -z "$n" ]; then
+      echo "Usage: sync.sh rename-repo <old alias> <new alias> [<url>]" >&2
+      exit 2
+    fi
+    if [ ! -d "$EXTRA/$o/.git" ]; then
+      echo "sync.sh: no memory repository \"$o\" on this machine." >&2
+      exit 1
+    fi
+    if [ "$o" != "$n" ]; then
+      if [ "$n" = main ] || [ "$(safe_name "$n")" != "$n" ]; then
+        echo "sync.sh: the alias must be lower case (a-z 0-9 . _ -) and not \"main\"." >&2
+        exit 1
+      fi
+      if [ -e "$EXTRA/$n" ]; then
+        echo "sync.sh: $EXTRA/$n exists already." >&2
+        exit 1
+      fi
+    fi
+    [ -n "$u" ] || u=$(git -C "$EXTRA/$o" remote get-url origin)
+    if ! GIT_TERMINAL_PROMPT=0 git ls-remote "$u" >/dev/null 2>&1; then
+      echo "sync.sh: cannot reach $u. Nothing changed." >&2
+      exit 1
+    fi
+    [ "$o" = "$n" ] || move_clone "$o" "$n"
+    git -C "$EXTRA/$n" remote set-url origin "$u"
+    mkdir -p "$(dirname "$REPOS_CONF")"
+    touch "$REPOS_CONF"
+    awk -v o="$o" -v n="$n" -v u="$u" '
+      $1 == o { print n " " u; done = 1; next }
+      { print }
+      END { if (!done) print n " " u }
+    ' "$REPOS_CONF" > "$REPOS_CONF.new" && mv "$REPOS_CONF.new" "$REPOS_CONF"
+    if [ "$o" != "$n" ]; then
+      touch "$REPOS_RENAMED"
+      grep -q -x "$o $n" "$REPOS_RENAMED" || echo "$o $n" >> "$REPOS_RENAMED"
+    fi
+    push "Rename memory repository $o to $n for $ME"
+    echo "Renamed: \"$o\" -> \"$n\" ($u)"
+    echo "  $EXTRA/$n"
+    echo "  Your other machines do the same at their next session."
+    ;;
   repos)
     repos | while IFS= read -r r; do
       url=$(git -C "$r" remote get-url origin 2>/dev/null)
@@ -1027,7 +1109,7 @@ case "$1" in
     done
     ;;
   *)
-    sed -n '2,40s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,44s/^# \{0,1\}//p' "$0" >&2
     exit 2
     ;;
 esac

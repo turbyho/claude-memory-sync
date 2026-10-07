@@ -69,4 +69,35 @@ check "push sends the changes of x" contains "$(git -C "$T/x.git" log --name-onl
 out=$(run a1 enable "$T/a1/src/app" --repo main 2>&1)
 check "enable --repo refuses a project of a different repository" contains "$out" "sync.sh move"
 
+# Rename: the git server renames x.git to y.git; alice renames the alias x to y.
+mv "$T/x.git" "$T/y.git"
+out=$(run a1 rename-repo x y "$T/y.git")
+Y1=$T/a1/.claude/claude-memory.d/y
+check "rename-repo renames the clone" sh -c '[ -d "$1/.git" ] && [ ! -e "$2" ]' x "$Y1" "$X1"
+check "rename-repo sets the new URL" [ "$(git -C "$Y1" remote get-url origin)" = "$T/y.git" ]
+check "rename-repo relinks the projects" [ "$(readlink "$(slug a1 app)")" = "$Y1/projects/app/users/alice" ]
+check "rename-repo changes repos.conf" grep -q -x "y $T/y.git" "$T/a1/.claude/claude-memory/users/alice/repos.conf"
+check "rename-repo removes the old line" sh -c '! grep -q "^x " "$1"' x "$T/a1/.claude/claude-memory/users/alice/repos.conf"
+check "rename-repo writes repos.renamed" grep -q -x "x y" "$T/a1/.claude/claude-memory/users/alice/repos.renamed"
+
+# The other machine of alice renames its clone at the next session.
+out=$(hook a2 app)
+Y2=$T/a2/.claude/claude-memory.d/y
+check "the other machine renames its clone" sh -c '[ -d "$1/.git" ] && [ ! -e "$2" ]' x "$Y2" "$T/a2/.claude/claude-memory.d/x"
+check "the rename is told to Claude" contains "$out" "renamed the memory repository \"x\" to \"y\""
+check "the other machine relinks the projects" [ "$(readlink "$(slug a2 app)")" = "$Y2/projects/app/users/alice" ]
+check "the other machine sets the new URL" [ "$(git -C "$Y2" remote get-url origin)" = "$T/y.git" ]
+check "no warning about a project in two repositories" sh -c '! printf "%s" "$1" | grep -q "more than one memory repository"' x "$out"
+echo "fact-c" > "$(slug a2 app)/fact-c.md"
+run a2 push
+check "push after the rename goes to the new URL" contains "$(git -C "$T/y.git" log --name-only --format= -1)" "fact-c.md"
+
+# bob has his own list of repositories: he renames too.
+out=$(run b1 rename-repo x team "$T/y.git")
+check "an other person can use a different alias" [ "$(readlink "$(slug b1 app)")" = "$T/b1/.claude/claude-memory.d/team/projects/app/users/bob" ]
+
+# A wrong URL changes nothing.
+out=$(run a1 rename-repo y z "$T/none.git" 2>&1)
+check "rename-repo with an unreachable URL changes nothing" sh -c '[ -d "$1" ] && printf "%s" "$2" | grep -q "Nothing changed"' x "$Y1" "$out"
+
 finish

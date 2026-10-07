@@ -4,6 +4,15 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.3 - 2026-10-07
+
+- New command `sync.sh rename-repo <old alias> <new alias> [<url>]`: renames the alias
+  of a memory repository and sets its new URL, for example after a rename on the git
+  server. It relinks the projects. Your other machines do the same at their next session
+  (`users/<user>/repos.renamed`).
+- `sync.sh pull` sets the URL of each clone to the URL in `repos.conf`.
+- Nothing to do for the user.
+
 ## v0.3.2 - 2026-10-07
 
 - Fixed: `tools/migrate.sh` wrote the date of the migration into `Last review:`. Claude

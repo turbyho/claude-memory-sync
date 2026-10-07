@@ -107,6 +107,7 @@ You can ask Claude to do these tasks in any language. Some examples:
 | History | "Show the changes to the memory of this project in the last week." |
 | Merge a conflict file | "Merge the `.<host>.md` files in the memory of this project." |
 | Other memory repository | "Add the memory repository `work` (git@git.example.com:team/claude-memory.git), and move this project to it." |
+| Renamed repository | "The repository `work` is now git@git.example.com:team/claude-memory-work.git. Rename the alias to `team`." |
 | Update the tool | "Update claude-memory-sync." |
 
 ## 3. The problem
@@ -227,6 +228,7 @@ Git syncs the repository between all machines and all persons.
 | `users/<user>/shared/<topic>/` | Personal shared topics (section 9). |
 | `CLAUDE-MEMORY.md` | Instructions for Claude. You import them into `~/.claude/CLAUDE.md`. |
 | `users/<user>/repos.conf` | The other memory repositories of a person (section 4.7). |
+| `users/<user>/repos.renamed` | The renamed aliases of a person, for the other machines (section 4.7). |
 | `skills/memory-lifecycle/` | Skill for Claude: roles and lifecycle (sections 5 and 10), with templates. |
 | `team-memory-check.default` | Forbidden patterns in the team memory (section 5.1). |
 | `sync.sh` | Sync script (POSIX sh). The hooks call it. |
@@ -355,6 +357,7 @@ wants private projects, he adds a private repository as a project repository.
 | `sync.sh enable [dir] --repo <alias>` | Enables a new project in that repository. |
 | `sync.sh move [dir] <alias>` | Moves the project (team memory and the personal memory of all persons) to that repository. `main` is the main repository. Each person needs a clone of the new repository. |
 | `sync.sh repos` | Shows the repositories and their projects. |
+| `sync.sh rename-repo <old> <new> [<url>]` | Renames the alias of a repository, and sets its new URL, for example after a rename on the git server. Your other machines do the same at their next session. Each person who uses the repository runs it one time, because each person has an own list of repositories. |
 
 Example: move two work projects to the repository of the team:
 
@@ -878,6 +881,7 @@ team record.
 | A file `<file>.<host>.md` | The script kept two versions (section 4.6). Merge them by hand, then delete the `<host>` file. |
 | A session in a subdirectory or a git worktree of a project | Claude Code uses the memory of the main working tree. It is the same memory. |
 | The memory of a project is a local directory, and the SessionStart hook says that the project moved | The project is in a repository without a clone on this machine. Run `sync.sh add-repo <alias> <url>`, then start a new session. |
+| A memory repository was renamed or moved on the git server | Run `sync.sh rename-repo <alias> <alias> <new url>` (the same alias), or give a new alias. Each person who uses the repository does it one time. |
 | The SessionStart hook says that a project is in more than one repository | Run `sync.sh repos`. Merge the two `projects/<name>/` directories by hand, and remove one. |
 | Claude does not know the local memory | The machine name changed: compare `sync.sh host` with the directories in `users/<user>/hosts/`. Rename the directory, or set `CLAUDE_MEMORY_HOST` (section 4.3). |
 
