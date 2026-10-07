@@ -96,6 +96,7 @@ You can ask Claude to do these tasks in any language. Some examples:
 | Who changed a record | "Show the history of the memory record about the build." |
 | History | "Show the changes to the memory of this project in the last week." |
 | Merge a conflict file | "Merge the `.<host>.md` files in the memory of this project." |
+| Other memory repository | "Add the memory repository `work` (git@git.example.com:team/claude-memory.git), and move this project to it." |
 | Update the tool | "Update claude-memory-sync." |
 
 ## 3. The problem
@@ -215,6 +216,7 @@ Git syncs the repository between all machines and all persons.
 | `shared/<topic>/` | Team shared topics (section 9). |
 | `users/<user>/shared/<topic>/` | Personal shared topics (section 9). |
 | `CLAUDE-MEMORY.md` | Instructions for Claude. You import them into `~/.claude/CLAUDE.md`. |
+| `users/<user>/repos.conf` | The other memory repositories of a person (section 4.7). |
 | `skills/memory-lifecycle/` | Skill for Claude: roles and lifecycle (sections 5 and 10), with templates. |
 | `team-memory-check.default` | Forbidden patterns in the team memory (section 5.1). |
 | `sync.sh` | Sync script (POSIX sh). The hooks call it. |
@@ -261,7 +263,8 @@ when you enable a project on one machine, git sends that state to all your machi
 | `sync.sh enable [dir]` | Makes `users/<user>/` (and `team/` if it does not exist), moves the local memory into it, makes the symlink, commits and pushes. |
 | `sync.sh disable [dir]` | Replaces your symlinks with local copies, removes `users/<user>/`, commits and pushes. The team memory and the memory of other persons do not change. |
 | `sync.sh status [dir]` | Shows the name, the person, the machine and the state of the project. |
-| `sync.sh list` | Shows the projects and the persons that use them. |
+| `sync.sh list` | Shows the projects, their repository and the persons that use them. |
+| `sync.sh add-repo`, `repos`, `move`, `enable --repo` | More memory repositories (section 4.7). |
 
 `dir` is the project directory. The default is the current directory.
 
@@ -291,12 +294,45 @@ When the script links an enabled project, it looks at the memory directory of th
 | Symlink | Nothing. |
 | Does not exist | Makes the symlink. |
 | Real directory | Copies the local files into `users/<user>/`, then makes the symlink. |
-| Symlink to a removed personal memory | You disabled the project on a different machine. Makes a local copy from the git history. |
+| Symlink to a removed personal memory, project now in a different repository | The project moved (`sync.sh move`). Makes the symlink to the new place. |
+| Symlink to a removed personal memory, project in no repository of this machine | You disabled the project, or it moved to a repository without a clone on this machine. Makes a local copy from the git history, and tells Claude why. |
 
 If a local file is different from the file in the repository, the script keeps the local
 version as `<file>.<host>.md` next to the repository version. The old local directory
 goes to `~/.claude/memory-backup/<slug>.<time>`. Merge the `<host>` file by hand, or ask
 Claude to do it. Then delete the `<host>` file.
+
+### 4.7 More memory repositories
+
+Projects can use different memory repositories. Example: the work projects use the
+repository of the company team, and the private projects use your private repository.
+
+- The main repository `~/.claude/claude-memory` holds the tool. The hooks run its
+  `sync.sh`. The projects that have no other repository are in it.
+- Each other repository has a clone in `~/.claude/claude-memory.d/<alias>/`. It can be a
+  copy of this template, or a repository with only memory (`projects/`, `users/`,
+  `shared/`). The tool in it is not used.
+- A project is in the repository that has the directory `projects/<name>/`. Each project
+  is in one repository.
+- Shared topics link only projects of the same repository.
+
+| Command | What it does |
+|---|---|
+| `sync.sh add-repo <alias> <url>` | Clones the repository, and adds it to `users/<user>/repos.conf` in the main repository. Your other machines clone it at their next session. |
+| `sync.sh enable [dir] --repo <alias>` | Enables a new project in that repository. |
+| `sync.sh move [dir] <alias>` | Moves the project (team memory and the personal memory of all persons) to that repository. `main` is the main repository. Each person needs a clone of the new repository. |
+| `sync.sh repos` | Shows the repositories and their projects. |
+
+Example: move two work projects to the repository of the team:
+
+```sh
+~/.claude/claude-memory/sync.sh add-repo work git@git.example.com:team/claude-memory.git
+~/.claude/claude-memory/sync.sh move ~/work/example-app work
+~/.claude/claude-memory/sync.sh move ~/work/example-api work
+```
+
+The hooks pull and push all repositories, and the PreToolUse hook checks the team memory
+of all repositories. The notices about a new release apply only to the main repository.
 
 ## 5. Memory roles
 
@@ -753,6 +789,8 @@ team record.
 | A team file is not committed | It contains a forbidden pattern. The SessionStart hook shows the lines. Move the machine detail to the local memory. Check with `sync.sh lint <file>`. |
 | A file `<file>.<host>.md` | The script kept two versions (section 4.6). Merge them by hand, then delete the `<host>` file. |
 | A session in a subdirectory or a git worktree of a project | Claude Code uses the memory of the main working tree. It is the same memory. |
+| The memory of a project is a local directory, and the SessionStart hook says that the project moved | The project is in a repository without a clone on this machine. Run `sync.sh add-repo <alias> <url>`, then start a new session. |
+| The SessionStart hook says that a project is in more than one repository | Run `sync.sh repos`. Merge the two `projects/<name>/` directories by hand, and remove one. |
 | Claude does not know the local memory | The machine name changed: compare `sync.sh host` with the directories in `users/<user>/hosts/`. Rename the directory, or set `CLAUDE_MEMORY_HOST` (section 4.3). |
 
 ## 13. Remove from a machine

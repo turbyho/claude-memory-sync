@@ -1,6 +1,6 @@
 ---
 name: memory-lifecycle
-description: Use when you write, review, promote or invalidate a record in the synced Claude memory (claude-memory-sync), or select its role (team, personal, local). Triggers - a new fact to save, a request to review the memory, a tentative record to confirm, a record that is false or outdated, a claim to compare with the known invalid records, a MEMORY.md that is near its size limit, a team memory record. Applies when the memory directory of the session is a symlink into ~/.claude/claude-memory, or when the SessionStart hook gave a team memory.
+description: Use when you write, review, promote or invalidate a record in the synced Claude memory (claude-memory-sync), or select its role (team, personal, local). Triggers - a new fact to save, a request to review the memory, a tentative record to confirm, a record that is false or outdated, a claim to compare with the known invalid records, a MEMORY.md that is near its size limit, a team memory record. Applies when the memory directory of the session is a symlink into ~/.claude/claude-memory or ~/.claude/claude-memory.d, or when the SessionStart hook gave a team memory.
 ---
 
 # Memory lifecycle
@@ -42,14 +42,18 @@ confirmed record is a fact. A tentative record is a hint.
 
 ## 3. Roles
 
-The repository `~/.claude/claude-memory` has three roles of memory for each project:
+A memory repository has three roles of memory for each project:
 
 | Role | Location | Who uses it |
 |---|---|---|
-| `team` | `~/.claude/claude-memory/projects/<name>/team/` | All persons that use the repository |
-| `personal` | `<memory>/` (`projects/<name>/users/<user>/`) | One person, on all machines of the person |
+| `team` | `<repo>/projects/<name>/team/` | All persons that use the repository |
+| `personal` | `<memory>/` (`<repo>/projects/<name>/users/<user>/`) | One person, on all machines of the person |
 | `local` | `<memory>/hosts/<host>/` | One person, on one machine |
 
+- `<repo>` is the memory repository of the project: the main repository
+  `~/.claude/claude-memory`, or `~/.claude/claude-memory.d/<alias>/`. Each project is in
+  one repository. `~/.claude/claude-memory/sync.sh status` shows it, and the SessionStart
+  hook gives the full paths.
 - `<user>` is the output of `~/.claude/claude-memory/sync.sh user`.
 - `<host>` is the output of `~/.claude/claude-memory/sync.sh host`. Do not use
   `hostname` directly, because on macOS its value can change with the network.
@@ -86,12 +90,13 @@ After the role, select the place of a `team` or `personal` record:
 
 | The fact applies to | Role `personal` | Role `team` |
 |---|---|---|
-| One project | `<memory>/` | `projects/<name>/team/` |
-| More than one project | Personal shared topic `users/<user>/shared/<topic>/` | Team shared topic `shared/<topic>/` |
+| One project | `<memory>/` | `<repo>/projects/<name>/team/` |
+| More than one project | Personal shared topic `<repo>/users/<user>/shared/<topic>/` | Team shared topic `<repo>/shared/<topic>/` |
 
 1. If the fact applies to more than one project, look at the shared topics of its role.
    The `## Groups` section of `MEMORY.md` links to them. Also run `ls` on
-   `~/.claude/claude-memory/shared/` and `~/.claude/claude-memory/users/<user>/shared/`.
+   `<repo>/shared/` and `<repo>/users/<user>/shared/`. A shared topic can only link
+   projects of the same repository.
 2. If a topic covers the fact, write the record into that topic (section 6).
 3. If no topic covers the fact, propose a new topic to the user: its name, its role and
    the projects that use it. Make it only after the approval (section 11.1). If the user
@@ -353,8 +358,8 @@ test server. There are two types:
 
 | Type | Location | Rules |
 |---|---|---|
-| Team shared topic | `~/.claude/claude-memory/shared/<topic>/` | Team memory: section 12 applies, the PreToolUse hook checks it. |
-| Personal shared topic | `~/.claude/claude-memory/users/<user>/shared/<topic>/` | Personal memory of one person, for more than one project of the person. No check of patterns. |
+| Team shared topic | `<repo>/shared/<topic>/` | Team memory: section 12 applies, the PreToolUse hook checks it. |
+| Personal shared topic | `<repo>/users/<user>/shared/<topic>/` | Personal memory of one person, for more than one project of the person. No check of patterns. |
 
 Use a personal shared topic for the facts of one person (for example, the access of the
 user to a home server, with paths of the user). Use a team shared topic for facts that
@@ -411,7 +416,7 @@ Do this only after the approval of the user (section 3.2).
 
 ## 12. Team memory
 
-The team memory of a project is in `~/.claude/claude-memory/projects/<name>/team/`. All
+The team memory of a project is in `<repo>/projects/<name>/team/`. All
 persons that use the repository read it. The SessionStart hook gives you its index.
 
 - **Approval.** Write, change, promote or invalidate a team record only after the user

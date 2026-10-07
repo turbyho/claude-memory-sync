@@ -20,6 +20,15 @@
 #   sync.sh list             Show the projects and the persons that use them.
 #   sync.sh user             Show the name of this person, as the memory uses it.
 #   sync.sh host             Show the name of this machine, as the memory uses it.
+#   sync.sh enable [dir] --repo <alias>
+#                            Enable the project in a different memory repository.
+#   sync.sh add-repo <alias> <url>
+#                            Add a memory repository for some projects. Its clone is in
+#                            ~/.claude/claude-memory.d/<alias>; all your machines get it.
+#   sync.sh repos            Show the memory repositories and their projects.
+#   sync.sh move [dir] <alias>
+#                            Move the project (team and personal memory) to a different
+#                            memory repository. "main" is ~/.claude/claude-memory.
 #   sync.sh setup            Set up this machine: hooks, instructions, skill. Idempotent.
 #   sync.sh update           Merge the latest release of claude-memory-sync from the remote
 #                            "upstream", push it, then run setup.
@@ -30,6 +39,8 @@
 # The script ignores network errors. Without the server, Claude uses the local copy.
 
 REPO=${CLAUDE_MEMORY_REPO:-$(cd "$(dirname "$0")" && pwd)}
+# Directory of the other memory repositories: one clone for each alias.
+EXTRA=${CLAUDE_MEMORY_EXTRA:-$HOME/.claude/claude-memory.d}
 PROJECTS="$HOME/.claude/projects"
 BACKUP="$HOME/.claude/memory-backup"
 TEMPLATES="$REPO/skills/memory-lifecycle/templates"
@@ -76,6 +87,62 @@ HOST=$(host_name)
 ME=$(user_name)
 START=$PWD
 cd "$REPO" || exit 0
+
+# The memory repositories: the main repository first, then each clone in EXTRA.
+repos() {
+  echo "$REPO"
+  for d in "$EXTRA"/*/; do
+    [ -d "$d.git" ] && echo "${d%/}"
+  done
+}
+
+# Alias of a repository: "main" for the main repository, else the directory name.
+repo_alias() {
+  if [ "$1" = "$REPO" ]; then echo main; else basename "$1"; fi
+}
+
+# Path of the repository with an alias. Empty if there is no clone.
+alias_path() {
+  if [ "$1" = main ]; then
+    echo "$REPO"
+  elif [ -d "$EXTRA/$1/.git" ]; then
+    echo "$EXTRA/$1"
+  fi
+}
+
+# The repository that has the project $1 (projects/<name>/). The main repository first.
+# Empty if no repository has it.
+repo_of() {
+  repos | while IFS= read -r r; do
+    if [ -d "$r/projects/$1" ]; then
+      echo "$r"
+      break
+    fi
+  done
+}
+
+# The list of the other memory repositories of this person: users/<user>/repos.conf in
+# the main repository, one line "<alias> <url>" for each repository.
+REPOS_CONF="$REPO/users/$ME/repos.conf"
+
+# Clone each repository of repos.conf that has no clone on this machine yet.
+clone_missing() {
+  [ -f "$REPOS_CONF" ] || return 0
+  sed '/^#/d;/^[[:space:]]*$/d' "$REPOS_CONF" | while read -r a u; do
+    [ -n "$a" ] && [ -n "$u" ] || continue
+    [ -d "$EXTRA/$a/.git" ] && continue
+    mkdir -p "$EXTRA"
+    if git clone -q "$u" "$EXTRA/$a" >/dev/null 2>&1; then
+      echo "NOTICE: cloned the memory repository \"$a\" to $EXTRA/$a."
+      echo
+    else
+      rm -rf "$EXTRA/$a"
+      echo "WARNING: cannot clone the memory repository \"$a\" ($u). The projects in it"
+      echo "are not synced on this machine. Tell the user."
+      echo
+    fi
+  done
+}
 
 # Read one field of the JSON hook input. $1 is the JSON text, $2 a jq expression, $3 the
 # same expression in Python (the variable d is the parsed input).
@@ -145,6 +212,23 @@ memory_dir() {
   echo "$PROJECTS/$(printf '%s' "$root" | LC_ALL=C sed 's/[^A-Za-z0-9]/-/g')/memory"
 }
 
+# Copy the files of directory $1 into directory $2, with the subdirectories. A file that
+# is only in $1 is copied. A file that is different in the two places is copied as
+# <file>.<host>.md next to the file in $2.
+merge_into() {
+  for f in "$1"/* "$1"/.[!.]*; do
+    [ -e "$f" ] || continue
+    b=$(basename "$f")
+    if [ ! -e "$2/$b" ]; then
+      cp -R "$f" "$2/$b"
+    elif [ -d "$f" ] && [ -d "$2/$b" ]; then
+      merge_into "$f" "$2/$b"
+    elif [ -f "$f" ] && ! cmp -s "$f" "$2/$b"; then
+      cp "$f" "$2/${b%.md}.$HOST.md"
+    fi
+  done
+}
+
 # Link the memory directory of a session to the personal memory in the repository. If a
 # local memory directory exists, copy its files into the repository first. If a file is
 # different in the two places, keep the local version as <file>.<host>.md.
@@ -153,15 +237,7 @@ link() {
   dst=$2
   [ -L "$mem" ] && return 0
   if [ -d "$mem" ]; then
-    for f in "$mem"/* "$mem"/.[!.]*; do
-      [ -e "$f" ] || continue
-      fname=$(basename "$f")
-      if [ ! -e "$dst/$fname" ]; then
-        cp -R "$f" "$dst/$fname"
-      elif ! cmp -s "$f" "$dst/$fname"; then
-        cp -R "$f" "$dst/${fname%.md}.$HOST.md"
-      fi
-    done
+    merge_into "$mem" "$dst"
     mkdir -p "$BACKUP"
     mv "$mem" "$BACKUP/$(basename "$(dirname "$mem")").$(date +%Y%m%d%H%M%S)"
   fi
@@ -194,7 +270,7 @@ conflict_warning() {
   for d in rebase-merge rebase-apply; do
     p=$(git rev-parse --git-path "$d" 2>/dev/null) || continue
     if [ -d "$p" ]; then
-      echo "WARNING: the memory repository $REPO has a rebase conflict. The sync stopped."
+      echo "WARNING: the memory repository $PWD has a rebase conflict. The sync stopped."
       echo "Tell the user. See README.md, section \"Conflicts\"."
       echo
       return
@@ -245,10 +321,11 @@ records() {
   done
 }
 
-# Write the team memory of a project to stdout: an index made from the frontmatter of the
-# records. The team memory has no INDEX.md, thus two persons cannot get a conflict in it.
+# Write the team memory of project $1 in repository $2 to stdout: an index made from the
+# frontmatter of the records. The team memory has no INDEX.md, thus two persons cannot
+# get a conflict in it.
 team_context() {
-  tdir="$REPO/projects/$1/team"
+  tdir="$2/projects/$1/team"
   [ -d "$tdir" ] || return 0
   echo "Team memory of this project (all persons see it): $tdir/"
   echo "Write a record there only with the approval of the user. No absolute paths, no"
@@ -276,10 +353,10 @@ team_context() {
 }
 
 # The forbidden patterns of the team memory, as one extended regular expression. The team
-# can change them in .memory-check in the root of the repository: one pattern on each
-# line, "#" starts a comment line.
+# can change them in .memory-check in the root of the repository (the current directory):
+# one pattern on each line, "#" starts a comment line.
 team_patterns() {
-  f="$REPO/.memory-check"
+  f="$PWD/.memory-check"
   [ -f "$f" ] || f="$REPO/team-memory-check.default"
   sed '/^#/d;/^[[:space:]]*$/d' "$f" | paste -sd '|' -
 }
@@ -519,7 +596,9 @@ update() {
   "$REPO/sync.sh" setup
 }
 
-# Set dir, name, mem, pdir (the project) and udir (the personal memory) from a directory.
+# Set dir, name, mem, repo (the repository of the project), pdir (the project) and udir
+# (the personal memory) from a directory. A project in no repository goes to the main
+# repository.
 target() {
   dir=$(abs_dir "${1:-.}")
   if [ -z "$dir" ]; then
@@ -528,12 +607,14 @@ target() {
   fi
   name=$(project_name "$dir")
   mem=$(memory_dir "$dir")
-  pdir="$REPO/projects/$name"
+  repo=$(repo_of "$name")
+  [ -n "$repo" ] || repo=$REPO
+  pdir="$repo/projects/$name"
   udir="$pdir/users/$ME"
 }
 
-# Wait until no other git command uses the repository (for example the async push of the
-# last reply). Maximum 10 seconds.
+# Wait until no other git command uses the repository in the current directory (for
+# example the async push of the last reply). Maximum 10 seconds.
 wait_for_lock() {
   lock=$(git rev-parse --git-path index.lock 2>/dev/null)
   i=0
@@ -543,36 +624,95 @@ wait_for_lock() {
   done
 }
 
+# The symlink of the session points to a personal memory that does not exist any more.
+# If the project is now in a different repository (sync.sh move), link it there. Else
+# make a local copy from the git history (sync.sh disable), and tell why.
+dangling() {
+  old=$(readlink "$mem")
+  if [ -d "$udir" ]; then
+    rm "$mem"
+    ln -s "$udir" "$mem"
+    echo "NOTICE: the project $name is now in the memory repository \"$(repo_alias "$repo")\"."
+    echo
+    return
+  fi
+  repos | while IFS= read -r r; do
+    case $old in
+      "$r"/*)
+        (
+          cd "$r" || exit 0
+          rel=${old#"$r"/}
+          unlink_copy "$mem" "$old" "$rel"
+          s=$(git log -1 --format=%s -- "projects/$name" 2>/dev/null)
+          case $s in
+            "Move project $name to "*)
+              echo "WARNING: $s. This machine has no clone of that memory repository, thus"
+              echo "the memory of $name is a local copy now. Tell the user: add the"
+              echo "repository with sync.sh add-repo, then start a new session."
+              echo
+              ;;
+          esac
+        )
+        break
+        ;;
+    esac
+  done
+}
+
 case "$1" in
   pull)
     dir=$(read_cwd)
+    # The main repository first: its repos.conf tells which other repositories to clone.
     wait_for_lock
     git pull -q --rebase=merges --autostash >/dev/null 2>&1
-    fetch_releases
     conflict_warning
-    update_notice
     lint_warning
+    clone_missing
+    repos | while IFS= read -r r; do
+      [ "$r" = "$REPO" ] && continue
+      (
+        cd "$r" || exit 0
+        wait_for_lock
+        git pull -q --rebase=merges --autostash >/dev/null 2>&1
+        conflict_warning
+        lint_warning
+      )
+    done
+    fetch_releases
+    update_notice
     [ -n "$dir" ] && [ -d "$dir" ] || exit 0
     target "$dir"
-    if [ -L "$mem" ] && [ ! -e "$mem" ] && [ "$(readlink "$mem")" = "$udir" ]; then
-      unlink_copy "$mem" "$udir" "projects/$name/users/$ME"
+    n=$(repos | while IFS= read -r r; do [ -d "$r/projects/$name" ] && echo "$r"; done | wc -l)
+    if [ "$n" -gt 1 ]; then
+      echo "WARNING: the project $name is in more than one memory repository. This session"
+      echo "uses \"$(repo_alias "$repo")\". Tell the user (sync.sh repos)."
+      echo
+    fi
+    if [ -L "$mem" ] && [ ! -e "$mem" ]; then
+      dangling
     elif [ -d "$udir" ]; then
       link "$mem" "$udir"
       local_context "$mem" "$udir"
     fi
-    team_context "$name"
+    team_context "$name" "$repo"
     ;;
   push)
-    push
+    repos | while IFS= read -r r; do
+      (cd "$r" && push)
+    done
     ;;
   check-team)
     input=$(cat)
     file=$(json_field "$input" '.tool_input.file_path' 'd.get("tool_input",{}).get("file_path","")') || exit 0
     rel=""
-    for base in "$REPO" "$(abs_dir "$REPO")"; do
-      case $file in "$base"/*) rel=${file#"$base"/} ;; esac
+    base_repo=""
+    for r in $(repos); do
+      for base in "$r" "$(abs_dir "$r")"; do
+        case $file in "$base"/*) rel=${file#"$base"/}; base_repo=$r ;; esac
+      done
     done
     [ -n "$rel" ] && is_team_path "$rel" || exit 0
+    cd "$base_repo" || exit 0
     text=$(json_field "$input" \
       '[.tool_input.content, .tool_input.new_string, (.tool_input.edits[]?.new_string)] | map(select(. != null)) | join("\n")' \
       '"\n".join([x for x in [d["tool_input"].get("content"), d["tool_input"].get("new_string")] + [e.get("new_string") for e in d["tool_input"].get("edits", [])] if x])')
@@ -588,13 +728,40 @@ case "$1" in
     fi
     ;;
   enable)
-    target "$2"
+    shift
+    d=.
+    want=""
+    while [ $# -gt 0 ]; do
+      case $1 in
+        --repo) want=$2; shift 2 ;;
+        *) d=$1; shift ;;
+      esac
+    done
+    target "$d"
+    if [ -n "$want" ]; then
+      wpath=$(alias_path "$want")
+      if [ -z "$wpath" ]; then
+        echo "sync.sh: no memory repository \"$want\". Add it with: sync.sh add-repo $want <url>" >&2
+        exit 1
+      fi
+      if [ -d "$pdir" ] && [ "$repo" != "$wpath" ]; then
+        echo "sync.sh: the project $name is in the memory repository \"$(repo_alias "$repo")\"." >&2
+        echo "To move it, use: sync.sh move $d $want" >&2
+        exit 1
+      fi
+      repo=$wpath
+      pdir="$repo/projects/$name"
+      udir="$pdir/users/$ME"
+    fi
     if [ ! -d "$pdir/team" ]; then
       mkdir -p "$pdir/team"
       printf '# Team memory: %s\n\nRules: skill memory-lifecycle, section "Team memory".\n' \
         "$name" > "$pdir/team/README.md"
     fi
     mkdir -p "$udir"
+    if [ -L "$mem" ] && [ "$(readlink "$mem")" != "$udir" ]; then
+      rm "$mem"
+    fi
     link "$mem" "$udir"
     if [ ! -e "$udir/MEMORY.md" ]; then
       if [ -f "$TEMPLATES/MEMORY.md" ]; then
@@ -605,8 +772,8 @@ case "$1" in
         : > "$udir/MEMORY.md"
       fi
     fi
-    push "Enable memory of $name for $ME"
-    echo "Enabled: $name for $ME"
+    (cd "$repo" && push "Enable memory of $name for $ME")
+    echo "Enabled: $name for $ME, in the memory repository \"$(repo_alias "$repo")\""
     echo "  $mem -> $udir"
     ;;
   disable)
@@ -615,6 +782,7 @@ case "$1" in
       echo "Not enabled: $name for $ME"
       exit 0
     fi
+    cd "$repo" || exit 1
     for m in "$PROJECTS"/*/memory; do
       [ -L "$m" ] && [ "$(readlink "$m")" = "$udir" ] &&
         unlink_copy "$m" "$udir" "projects/$name/users/$ME"
@@ -627,6 +795,89 @@ case "$1" in
     echo "  Your other machines make a local copy at their next session in the project."
     echo "  The team memory and the memory of other persons do not change."
     ;;
+  add-repo)
+    a=$2
+    u=$3
+    if [ -z "$a" ] || [ -z "$u" ]; then
+      echo "Usage: sync.sh add-repo <alias> <url>" >&2
+      exit 2
+    fi
+    if [ "$a" = main ] || [ "$(safe_name "$a")" != "$a" ]; then
+      echo "sync.sh: the alias must be lower case (a-z 0-9 . _ -) and not \"main\"." >&2
+      exit 1
+    fi
+    if [ ! -d "$EXTRA/$a/.git" ]; then
+      mkdir -p "$EXTRA"
+      if ! git clone -q "$u" "$EXTRA/$a"; then
+        echo "sync.sh: cannot clone $u" >&2
+        exit 1
+      fi
+    fi
+    mkdir -p "$(dirname "$REPOS_CONF")"
+    touch "$REPOS_CONF"
+    if ! grep -q "^$a " "$REPOS_CONF"; then
+      echo "$a $u" >> "$REPOS_CONF"
+    fi
+    push "Add memory repository $a for $ME"
+    echo "Added: \"$a\" -> $EXTRA/$a"
+    echo "  Your other machines clone it at their next session."
+    echo "  Enable a project in it: sync.sh enable <dir> --repo $a"
+    ;;
+  repos)
+    repos | while IFS= read -r r; do
+      url=$(git -C "$r" remote get-url origin 2>/dev/null)
+      echo "$(repo_alias "$r")  $r  ($url)"
+      for p in "$r"/projects/*/; do
+        [ -d "$p" ] || continue
+        users=$(cd "$p" && ls users 2>/dev/null | tr '\n' ' ')
+        echo "    $(basename "$p"): ${users:-(no persons)}"
+      done
+    done
+    ;;
+  move)
+    if [ $# -eq 2 ]; then d=.; to=$2; else d=$2; to=$3; fi
+    target "$d"
+    tpath=$(alias_path "$to")
+    if [ -z "$tpath" ]; then
+      echo "sync.sh: no memory repository \"$to\". Add it with: sync.sh add-repo $to <url>" >&2
+      exit 1
+    fi
+    if [ ! -d "$pdir" ]; then
+      echo "sync.sh: the project $name is in no memory repository." >&2
+      exit 1
+    fi
+    if [ "$repo" = "$tpath" ]; then
+      echo "The project $name is in \"$to\" already."
+      exit 0
+    fi
+    if [ -d "$tpath/projects/$name" ]; then
+      echo "sync.sh: \"$to\" has a project $name already. Merge them by hand." >&2
+      exit 1
+    fi
+    from=$repo
+    mkdir -p "$tpath/projects"
+    cp -R "$pdir" "$tpath/projects/$name"
+    (cd "$tpath" && push "Move project $name from $(repo_alias "$from")")
+    for m in "$PROJECTS"/*/memory; do
+      [ -L "$m" ] || continue
+      case $(readlink "$m") in
+        "$pdir/users/"*)
+          t=$(readlink "$m")
+          rm "$m"
+          ln -s "$tpath/projects/$name/${t#"$pdir/"}" "$m"
+          ;;
+      esac
+    done
+    (
+      cd "$from" || exit 1
+      git rm -r -q "projects/$name" >/dev/null 2>&1
+      rm -rf "projects/$name"
+      push "Move project $name to $to"
+    )
+    echo "Moved: $name from \"$(repo_alias "$from")\" to \"$to\""
+    echo "  The team memory and the personal memory of all persons moved."
+    echo "  Each person needs a clone of \"$to\" (sync.sh add-repo $to <url>)."
+    ;;
   lint)
     shift
     cd "$START" || exit 1
@@ -635,6 +886,7 @@ case "$1" in
   status)
     target "$2"
     echo "Project:    $name"
+    echo "Repository: $(repo_alias "$repo") ($repo)"
     echo "Person:     $ME"
     echo "Machine:    $HOST"
     if [ -d "$udir" ]; then
@@ -656,10 +908,12 @@ case "$1" in
     fi
     ;;
   list)
-    for p in "$REPO"/projects/*/; do
-      [ -d "$p" ] || continue
-      users=$(cd "$p" && ls users 2>/dev/null | tr '\n' ' ')
-      echo "$(basename "$p"): ${users:-(no persons)}"
+    repos | while IFS= read -r r; do
+      for p in "$r"/projects/*/; do
+        [ -d "$p" ] || continue
+        users=$(cd "$p" && ls users 2>/dev/null | tr '\n' ' ')
+        echo "$(basename "$p") [$(repo_alias "$r")]: ${users:-(no persons)}"
+      done
     done
     ;;
   user)
@@ -680,7 +934,7 @@ case "$1" in
     echo "Machine setup:   $(cat "$SETUP_FILE" 2>/dev/null || echo 0) (needed: $SETUP_VERSION)"
     ;;
   *)
-    sed -n '2,32s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,40s/^# \{0,1\}//p' "$0" >&2
     exit 2
     ;;
 esac

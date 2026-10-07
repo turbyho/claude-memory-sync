@@ -1,26 +1,32 @@
 ## Claude memory: synced repository
 
-The auto memory of some projects is in the git repository `~/.claude/claude-memory`. A
-sync script copies it to all machines and to all persons that use the repository. Full
-description: `~/.claude/claude-memory/README.md`. Full procedure: skill
-`memory-lifecycle`. Load the skill before you write, review or invalidate a record.
+The auto memory of some projects is in git repositories. A sync script copies it to all
+machines and to all persons that use the repository. The tool is in the main repository
+`~/.claude/claude-memory`. Full description: `~/.claude/claude-memory/README.md`. Full
+procedure: skill `memory-lifecycle`. Load the skill before you write, review or
+invalidate a record.
+
+`<repo>` is the memory repository of the project: the main repository, or a different
+repository in `~/.claude/claude-memory.d/<alias>/`. `sync.sh status` shows it. The
+SessionStart hook gives the full paths.
 
 ### Roles
 
 | Role | Location | Who uses it |
 |---|---|---|
-| Team | `~/.claude/claude-memory/projects/<name>/team/` | All persons that use the repository |
-| Personal | the memory directory of the session (`projects/<name>/users/<user>/`) | One person, on all machines of the person |
+| Team | `<repo>/projects/<name>/team/` | All persons that use the repository |
+| Personal | the memory directory of the session (`<repo>/projects/<name>/users/<user>/`) | One person, on all machines of the person |
 | Local | `<memory directory>/hosts/<host>/` | One person, on one machine |
 
-- The memory directory of the session is a symlink to `projects/<name>/users/<user>/` if
-  the personal memory is enabled. If it is a real directory, the personal memory is not
-  synced. If the user asks to enable it, run
-  `~/.claude/claude-memory/sync.sh enable <project-dir>`.
+- The memory directory of the session is a symlink to `<repo>/projects/<name>/users/<user>/`
+  if the personal memory is enabled. If it is a real directory, the personal memory is
+  not synced. If the user asks to enable it, run
+  `~/.claude/claude-memory/sync.sh enable <project-dir>`. To use a different repository,
+  add `--repo <alias>`.
 - The SessionStart hook gives you the index of the local memory and of the team memory.
 - A line in `## Groups` of `MEMORY.md` can link to a shared topic for more than one
-  project: `~/.claude/claude-memory/shared/<topic>/` (team) or
-  `~/.claude/claude-memory/users/<user>/shared/<topic>/` (personal).
+  project: `<repo>/shared/<topic>/` (team) or `<repo>/users/<user>/shared/<topic>/`
+  (personal). A shared topic is in the same repository as its projects.
 - `<user>` is the output of `~/.claude/claude-memory/sync.sh user`, `<host>` the output
   of `~/.claude/claude-memory/sync.sh host`.
 - All persons with access to the repository can read all roles. Do not write private

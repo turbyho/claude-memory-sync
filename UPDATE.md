@@ -112,6 +112,12 @@ example, the user changed the skill), and the release changes the same lines.
 Each release can add steps here. Do the steps of each release after the old version, in
 the sequence of the versions.
 
+### v0.2.0
+
+No more steps. After the update, tell the user that projects can now use different
+memory repositories (README.md, section 4.7), and give the commands `sync.sh add-repo`,
+`sync.sh move` and `sync.sh repos`.
+
 ### v0.1.0
 
 First release.
