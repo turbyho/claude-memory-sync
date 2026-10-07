@@ -11,6 +11,7 @@
 # Usage:
 #   tools/migrate.sh --old <old repo> --new <new repo> --user <user> --host <host>
 #                    [--local <file>] [--status verified|confirmed|tentative] [--date YYYY-MM-DD]
+#                    [--reviewed]
 #
 #   --old     Working tree of the old repository. The script only reads it.
 #   --new     Clone of the new memory repository (a copy of the template). The script
@@ -22,11 +23,15 @@
 #   --status  State of the records: "verified" (default) gives "confirmed" to the
 #             records with metadata.verified, and "tentative" to the other records.
 #   --date    Date of the history line. Default: today.
+#   --reviewed
+#             You did a review of all records before the migration. The indexes get
+#             "Last review: <date>". Default: "Last review: never", thus Claude offers a
+#             review of the tentative records at the next session.
 #
 # After the migration: run tools/validate.sh, read the result, then commit and push.
 set -e
 
-OLD="" NEW="" ME="" HOST="" LOCALS="" STATUS=verified TODAY=$(date +%Y-%m-%d)
+OLD="" NEW="" ME="" HOST="" LOCALS="" STATUS=verified TODAY=$(date +%Y-%m-%d) REVIEWED=no
 while [ $# -gt 0 ]; do
   case $1 in
     --old) OLD=$2; shift 2 ;;
@@ -36,11 +41,12 @@ while [ $# -gt 0 ]; do
     --local) LOCALS=$2; shift 2 ;;
     --status) STATUS=$2; shift 2 ;;
     --date) TODAY=$2; shift 2 ;;
-    *) sed -n '2,30s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+    --reviewed) REVIEWED=yes; shift ;;
+    *) sed -n '2,34s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
   esac
 done
 if [ -z "$OLD" ] || [ -z "$NEW" ] || [ -z "$ME" ] || [ -z "$HOST" ]; then
-  sed -n '2,30s/^# \{0,1\}//p' "$0" >&2
+  sed -n '2,34s/^# \{0,1\}//p' "$0" >&2
   exit 2
 fi
 case $STATUS in verified|confirmed|tentative) ;; *) echo "migrate.sh: bad --status" >&2; exit 2 ;; esac
@@ -195,7 +201,11 @@ for pdir in "$OLD"/projects/*/; do
 
   # The new personal index.
   {
-    sed "s/^Last review: never$/Last review: $TODAY/" "$TPL/MEMORY.md" |
+    if [ "$REVIEWED" = yes ]; then
+      sed "s/^Last review: never$/Last review: $TODAY/" "$TPL/MEMORY.md"
+    else
+      cat "$TPL/MEMORY.md"
+    fi |
       awk '/^## Confirmed/ { exit } { print }'
     if [ -s "$WORK/kept" ]; then cat "$WORK/kept"; echo; fi
     echo "## Confirmed"; echo

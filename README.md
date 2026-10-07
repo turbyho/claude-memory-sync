@@ -576,6 +576,9 @@ and shared directories at the root that the projects link with symlinks), migrat
      --host "$(~/.claude/claude-memory/sync.sh host)" --local local.txt
    ```
 
+   - The indexes get `Last review: never`, thus Claude offers a review of the tentative
+     records at the next session. If you did a review of all records before, add
+     `--reviewed`.
    - Records with `metadata.verified` become `confirmed`, the other records `tentative`.
      Use `--status confirmed` or `--status tentative` to give all records one state.
    - Each shared directory becomes a personal shared topic `users/<user>/shared/<dir>/`.

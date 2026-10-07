@@ -4,6 +4,16 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.2 - 2026-10-07
+
+- Fixed: `tools/migrate.sh` wrote the date of the migration into `Last review:`. Claude
+  then did not offer a review of the tentative records for 14 days, although nobody did
+  a review. Now the default is `Last review: never`. Use `--reviewed` if you did a review
+  of all records before the migration.
+- `Last review: never` tells Claude to offer a review if there are tentative records.
+- What to do: if `tools/migrate.sh` of an older release migrated your memory, the update
+  asks you if it can set `Last review: never` (UPDATE.md, step for v0.3.2).
+
 ## v0.3.1 - 2026-10-07
 
 - Fixed: `sync.sh status`, `enable`, `disable` and `move` without a directory used the

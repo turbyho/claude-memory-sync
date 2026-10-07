@@ -52,7 +52,11 @@ check "the local record goes to hosts/<host>" grep -q '^  role: local' "$N/app/u
 check "the local index has the record" grep -q '](probe.md)' "$N/app/users/alice/hosts/laptop/INDEX.md"
 check "the personal index has no local record" sh -c '! grep -q "](probe.md)" "$1"' x "$N/app/users/alice/MEMORY.md"
 check "the topic heading stays" grep -q '^### Build' "$N/app/users/alice/MEMORY.md"
-check "the index has a visible review line" grep -q -x 'Last review: 2026-01-02' "$N/app/users/alice/MEMORY.md"
+check "without --reviewed the index has Last review: never" grep -q -x 'Last review: never' "$N/app/users/alice/MEMORY.md"
+git clone -q "$T/new.git" "$T/new2"
+sh "$SRC/tools/migrate.sh" --old "$O" --new "$T/new2" --user alice --host laptop \
+  --date 2026-01-02 --reviewed >/dev/null 2>&1
+check "with --reviewed the index has the date" grep -q -x 'Last review: 2026-01-02' "$T/new2/projects/app/users/alice/MEMORY.md"
 check "the kept text stays" grep -q '^Format note for this project.' "$N/app/users/alice/MEMORY.md"
 check "the old note about the shared dir is removed" sh -c '! grep -q "Shared with" "$1"' x "$N/app/users/alice/MEMORY.md"
 check "the shared dir becomes a personal shared topic" [ -f "$T/new/users/alice/shared/infra/server.md" ]

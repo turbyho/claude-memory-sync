@@ -211,9 +211,10 @@ Do a review when:
 
 - The user asks for it.
 - The section `## Tentative` has more than 10 lines.
-- The date in the line `Last review: <date>` of `MEMORY.md` is older than 14 days, and there
-  are tentative records. In this case, offer the review to the user. Do not start it
-  without approval.
+- The date in the line `Last review: <date>` of `MEMORY.md` is older than 14 days, or the
+  line is `Last review: never`, and there are tentative records. In this case, offer the
+  review to the user. Do not start it without approval. If the user declines, do not
+  offer it again in the same session.
 
 ### 7.1 Procedure
 

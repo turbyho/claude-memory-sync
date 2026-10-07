@@ -81,8 +81,9 @@ record always stays in the project.
 - When evidence shows that a record is not correct, do not delete it. Move it to
   `invalid/` with the reason.
 - The weight of a record comes from its state, not from the position of its line.
-- If the line `Last review: <date>` in `MEMORY.md` is older than 14 days and there are
-  tentative records, offer a review to the user.
+- If the line `Last review: <date>` in `MEMORY.md` is older than 14 days, or it is
+  `Last review: never`, and there are tentative records, offer a review to the user.
+  The date is the date of the last real review, not of a migration or an update.
 
 ### Sync
 

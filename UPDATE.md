@@ -112,6 +112,20 @@ example, the user changed the skill), and the release changes the same lines.
 Each release can add steps here. Do the steps of each release after the old version, in
 the sequence of the versions.
 
+### v0.3.2
+
+Do this step only if `tools/migrate.sh` of an older release migrated the memory. Signs:
+the records have the history line `<date> <user>@<host> migrated`, and the line
+`Last review:` of `MEMORY.md` has the same date. Then nobody did a review: the date is
+the date of the migration.
+
+1. Tell the user: the review date is the date of the migration, and N records are
+   tentative.
+2. Ask the user if you can set `Last review: never` in these `MEMORY.md` files. Then you
+   offer a review of the tentative records in each project.
+3. After the approval, change the line in each applicable `MEMORY.md`. The Stop hook
+   commits and pushes the change.
+
 ### v0.3.1
 
 The `MEMORY.md` files from before v0.3.1 have the date of the last review and the rules
