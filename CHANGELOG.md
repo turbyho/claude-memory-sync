@@ -4,6 +4,18 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.1 - 2026-10-07
+
+- Fixed: `sync.sh status`, `enable`, `disable` and `move` without a directory used the
+  memory repository as the project, not the current directory. A relative path was also
+  wrong. Now the default directory and a relative path are from the directory where you
+  start `sync.sh`.
+- Fixed: Claude did not see the date of the last review and the rules line in
+  `MEMORY.md`, because Claude Code removes HTML comments before it loads the file. They
+  are now visible lines: `Last review: <date>` and `Rules: ...`.
+- New tool `tools/visible-notes.sh <memory repo>`: changes the comments in existing
+  `MEMORY.md` files to visible lines. The update to v0.3.1 runs it.
+
 ## v0.3.0 - 2026-10-07
 
 - All memory repositories are equal. Each one has the tool, thus a repository can be the

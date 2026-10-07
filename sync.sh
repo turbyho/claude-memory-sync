@@ -666,11 +666,17 @@ update() {
 
 # Set dir, name, mem, repo (the repository of the project), pdir (the project) and udir
 # (the personal memory) from a directory. A project in no repository goes to the main
-# repository.
+# repository. The default directory and a relative path are from the directory where the
+# user started sync.sh (START), not from the repository.
 target() {
-  dir=$(abs_dir "${1:-.}")
+  d=${1:-$START}
+  case $d in
+    /*) ;;
+    *) d="$START/$d" ;;
+  esac
+  dir=$(abs_dir "$d")
   if [ -z "$dir" ]; then
-    echo "sync.sh: not a directory: ${1:-.}" >&2
+    echo "sync.sh: not a directory: ${1:-$START}" >&2
     exit 1
   fi
   name=$(project_name "$dir")

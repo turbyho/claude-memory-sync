@@ -112,6 +112,21 @@ example, the user changed the skill), and the release changes the same lines.
 Each release can add steps here. Do the steps of each release after the old version, in
 the sequence of the versions.
 
+### v0.3.1
+
+The `MEMORY.md` files from before v0.3.1 have the date of the last review and the rules
+in HTML comments. Claude Code removes HTML comments, thus Claude does not see them. Make
+them visible in each memory repository (`sync.sh repos` shows them):
+
+```sh
+~/.claude/claude-memory/tools/visible-notes.sh ~/.claude/claude-memory
+~/.claude/claude-memory/tools/visible-notes.sh ~/.claude/claude-memory.d/<alias>
+```
+
+The script changes only your files and the files of other persons in the repository that
+have the old comments. The Stop hook commits and pushes the changes. Tell the user how
+many files changed in each repository.
+
 ### v0.3.0
 
 The `sync.sh` before v0.3.0 updates only the main repository. Thus run the update one

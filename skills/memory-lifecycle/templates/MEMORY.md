@@ -1,8 +1,7 @@
 # Memory index
 
-<!-- last-review: never -->
-<!-- Rules: skill memory-lifecycle. One line for each record or group. Claude Code loads only the first 200 lines or 25 KB. -->
-<!-- Records for one machine only: hosts/<host>/INDEX.md, <host> = output of ~/.claude/claude-memory/sync.sh host. The SessionStart hook loads it. -->
+Last review: never
+Rules: skill memory-lifecycle. One line for each record or group. Records for one machine: hosts/<host>/INDEX.md (the SessionStart hook loads it).
 
 ## Confirmed
 

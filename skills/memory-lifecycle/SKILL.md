@@ -211,7 +211,7 @@ Do a review when:
 
 - The user asks for it.
 - The section `## Tentative` has more than 10 lines.
-- The date in `<!-- last-review: ... -->` of `MEMORY.md` is older than 14 days, and there
+- The date in the line `Last review: <date>` of `MEMORY.md` is older than 14 days, and there
   are tentative records. In this case, offer the review to the user. Do not start it
   without approval.
 
@@ -226,7 +226,7 @@ Do a review when:
 4. Do the approved decisions:
    - Change `status`, add a history line, and move the index line to its new section.
    - For an invalidation, use section 8.
-5. Set `<!-- last-review: <date> -->` in `MEMORY.md` to the date of today.
+5. Set the line `Last review: <date>` in `MEMORY.md` to the date of today.
 6. Report what you changed.
 
 ### 7.2 Decisions
@@ -325,6 +325,9 @@ Rules:
 
 - Keep each line short: a link, a dash, and one line of description. The description
   tells you if the record applies, thus it must contain the key words.
+- Do not put information for Claude into an HTML comment (`<!-- ... -->`) in
+  `MEMORY.md`. Claude Code removes these comments before it loads the file, thus you do
+  not see them at the start of a session.
 - If `MEMORY.md` is longer than 150 lines, make groups (section 10.1). Do not wait for the
   limit of Claude Code.
 - If `MEMORY.md` has no sections (an old memory), add them. Put the existing lines into

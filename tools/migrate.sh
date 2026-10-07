@@ -195,7 +195,7 @@ for pdir in "$OLD"/projects/*/; do
 
   # The new personal index.
   {
-    sed "s/<!-- last-review: never -->/<!-- last-review: $TODAY -->/" "$TPL/MEMORY.md" |
+    sed "s/^Last review: never$/Last review: $TODAY/" "$TPL/MEMORY.md" |
       awk '/^## Confirmed/ { exit } { print }'
     if [ -s "$WORK/kept" ]; then cat "$WORK/kept"; echo; fi
     echo "## Confirmed"; echo

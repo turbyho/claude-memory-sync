@@ -52,6 +52,7 @@ check "the local record goes to hosts/<host>" grep -q '^  role: local' "$N/app/u
 check "the local index has the record" grep -q '](probe.md)' "$N/app/users/alice/hosts/laptop/INDEX.md"
 check "the personal index has no local record" sh -c '! grep -q "](probe.md)" "$1"' x "$N/app/users/alice/MEMORY.md"
 check "the topic heading stays" grep -q '^### Build' "$N/app/users/alice/MEMORY.md"
+check "the index has a visible review line" grep -q -x 'Last review: 2026-01-02' "$N/app/users/alice/MEMORY.md"
 check "the kept text stays" grep -q '^Format note for this project.' "$N/app/users/alice/MEMORY.md"
 check "the old note about the shared dir is removed" sh -c '! grep -q "Shared with" "$1"' x "$N/app/users/alice/MEMORY.md"
 check "the shared dir becomes a personal shared topic" [ -f "$T/new/users/alice/shared/infra/server.md" ]
@@ -70,6 +71,25 @@ check "validate passes after the fix" contains "$out" "OK: 6 records, no problem
 
 out=$(sh "$SRC/tools/migrate.sh" --old "$O" --new "$T/new" --user alice --host laptop 2>&1)
 check "migrate does not overwrite an existing personal memory" contains "$out" "exists. Stop."
+
+# visible-notes: the HTML comments of an index from before v0.3.1 become visible lines.
+V=$N/web/users/alice/MEMORY.md
+{
+  echo "# Memory index"
+  echo
+  echo "<!-- last-review: 2026-01-05 -->"
+  echo "<!-- Rules: skill memory-lifecycle. One line for each record or group. Claude Code loads only the first 200 lines or 25 KB. -->"
+  echo "<!-- Records for one machine only: hosts/<host>/INDEX.md, <host> = output of ~/.claude/claude-memory/sync.sh host. The SessionStart hook loads it. -->"
+  echo
+  echo "## Confirmed"
+} > "$V"
+sh "$SRC/tools/visible-notes.sh" "$T/new" >/dev/null
+check "visible-notes makes the review line visible" grep -q -x 'Last review: 2026-01-05' "$V"
+check "visible-notes adds one visible rules line" [ "$(grep -c '^Rules: skill memory-lifecycle' "$V")" = 1 ]
+check "visible-notes removes the comments" sh -c '! grep -q "<!--" "$1"' x "$V"
+cp "$V" "$T/v1"
+sh "$SRC/tools/visible-notes.sh" "$T/new" >/dev/null
+check "visible-notes changes nothing the second time" cmp -s "$V" "$T/v1"
 
 # relink: a symlink to the old repository goes to the new one.
 mkdir -p "$T/home/.claude/projects/-src-app"

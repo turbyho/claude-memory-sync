@@ -87,4 +87,18 @@ printf '{"cwd":"%s"}' "$T/a1/src/chapp-wt" | HOME=$T/a1 LANG=cs_CZ.UTF-8 "$T/a1/
 check "subdirectory uses the slug of the main working tree" [ -L "$(slug a1 chapp)" ]
 check "worktree makes no other memory directory" [ ! -e "$(slug a1 chapp-wt)" ]
 
+# The default directory and a relative path are from the directory of the user, not
+# from the repository.
+out=$(cd "$T/a1/src/chapp" && HOME=$T/a1 CLAUDE_MEMORY_HOST=a1 "$T/a1/.claude/claude-memory/sync.sh" status)
+check "status without a directory shows the project of the current directory" contains "$out" "Project:    chapp"
+project a1 rel git@example.com:corp/rel.git
+(cd "$T/a1/src" && HOME=$T/a1 CLAUDE_MEMORY_HOST=a1 "$T/a1/.claude/claude-memory/sync.sh" enable rel >/dev/null)
+check "enable with a relative path enables that project" [ -d "$T/a1/.claude/claude-memory/projects/rel/users/alice" ]
+check "enable with a relative path does not enable the repository" [ ! -d "$T/a1/.claude/claude-memory/projects/claude-memory" ]
+
+# The index has visible notes: Claude Code removes HTML comments from MEMORY.md.
+idx=$T/a1/.claude/claude-memory/projects/rel/users/alice/MEMORY.md
+check "a new index has a visible review line" grep -q -x 'Last review: never' "$idx"
+check "a new index has no HTML comment" sh -c '! grep -q "<!--" "$1"' x "$idx"
+
 finish
