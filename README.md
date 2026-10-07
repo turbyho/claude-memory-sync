@@ -696,7 +696,15 @@ Do these steps in the repository of the tool, not in a memory repository:
    change `setup()` in `sync.sh`, and increase `SETUP_VERSION`.
 4. If the update needs more steps (for example a change of the memory layout), add them
    to `UPDATE.md`, section "Steps for each release".
-5. Commit, tag and push:
+5. Run the tests. `tests/test-release.sh` makes sure that `VERSION`, `CHANGELOG.md` and
+   `UPDATE.md` agree:
+
+   ```sh
+   tests/run.sh
+   ```
+
+6. Commit, tag and push. Do not change a tag after the push: if a release is wrong,
+   publish a new release.
 
    ```sh
    git commit -am "Release vX.Y.Z"
@@ -1088,6 +1096,7 @@ tests/run.sh
 | `tests/test-repos.sh` | More memory repositories: add-repo, enable --repo, move, relink, local copy |
 | `tests/test-shared-main.sh` | One repository as the main repository of one person and a project repository of an other person; tool in each repository; update of all copies |
 | `tests/test-migrate.sh` | `tools/migrate.sh`, `tools/validate.sh`, `tools/relink.sh` |
+| `tests/test-release.sh` | `VERSION`, `CHANGELOG.md`, `UPDATE.md` and the latest tag agree |
 
 Rules for a change:
 

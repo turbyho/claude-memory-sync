@@ -4,6 +4,11 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.5 - 2026-10-07
+
+- Fixed: the release v0.3.4 has the wrong `VERSION` (0.3.3). Use v0.3.5. The content of
+  v0.3.5 is the same as v0.3.4.
+
 ## v0.3.4 - 2026-10-07
 
 - Fixed: `tools/relink.sh` looked for a project only in the main repository. A project
