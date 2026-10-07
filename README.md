@@ -72,6 +72,15 @@ Give Claude the same prompt. A person who joins a team gives the list of the pro
 that the person wants to use. On a second machine of the same person, the list is not
 necessary: the projects of the person are enabled already.
 
+A person in a team has two possibilities (section 4.7):
+
+- Use the team repository as the main repository: give its URL in the prompt. The person
+  needs no other repository.
+- Use an own private repository as the main repository, and add the team repository as
+  a project repository. Add to the prompt: "Then add the team repository
+  git@git.example.com:team/claude-memory.git as the project repository `team`, and
+  enable these projects in it: ..."
+
 To enable one more project later, start Claude Code in that project and say: "Enable the
 memory for this project."
 
@@ -305,23 +314,44 @@ version as `<file>.<host>.md` next to the repository version. The old local dire
 goes to `~/.claude/memory-backup/<slug>.<time>`. Merge the `<host>` file by hand, or ask
 Claude to do it. Then delete the `<host>` file.
 
-### 4.7 More memory repositories
+### 4.7 Main and project repositories
 
 Projects can use different memory repositories. Example: the work projects use the
 repository of the company team, and the private projects use your private repository.
 
-- The main repository `~/.claude/claude-memory` holds the tool. The hooks run its
-  `sync.sh`. The projects that have no other repository are in it.
-- Each other repository has a clone in `~/.claude/claude-memory.d/<alias>/`. It can be a
-  copy of this template, or a repository with only memory (`projects/`, `users/`,
-  `shared/`). The tool in it is not used.
+All memory repositories are equal: each one contains the tool and the memory. The role of
+a repository is different for each person:
+
+| Role for a person | Clone | What it does |
+|---|---|---|
+| Main repository | `~/.claude/claude-memory` | The hooks run its `sync.sh`. New projects go into it. It has the list of the other repositories of the person (`users/<user>/repos.conf`). |
+| Project repository | `~/.claude/claude-memory.d/<alias>/` | Holds the memory of some projects. Its tool is not used. |
+
+Thus one repository can be the main repository of one person and a project repository of
+an other person:
+
+| Repository | alice | bob |
+|---|---|---|
+| `alice/claude-memory` (private) | main | - |
+| `team/claude-memory` (team) | project repository `team` | main |
+
+bob does not need a private repository: the team repository is his main repository. If he
+wants private projects, he adds a private repository as a project repository.
+
 - A project is in the repository that has the directory `projects/<name>/`. Each project
   is in one repository.
 - Shared topics link only projects of the same repository.
+- Each memory repository has the tool, thus each one can be a main repository.
+  `sync.sh add-repo` puts the tool into a repository that has none. If the repository
+  has files that the tool also has (for example a `README.md` made by the git server),
+  the repository keeps its own files.
+- `sync.sh update` puts a new release into the main repository and into each project
+  repository with an older tool (section 7.1). A repository without write access does
+  not change.
 
 | Command | What it does |
 |---|---|
-| `sync.sh add-repo <alias> <url>` | Clones the repository, and adds it to `users/<user>/repos.conf` in the main repository. Your other machines clone it at their next session. |
+| `sync.sh add-repo <alias> <url>` | Clones the repository, puts the tool into it if it has none, and adds it to `users/<user>/repos.conf` in the main repository. Your other machines clone it at their next session. |
 | `sync.sh enable [dir] --repo <alias>` | Enables a new project in that repository. |
 | `sync.sh move [dir] <alias>` | Moves the project (team memory and the personal memory of all persons) to that repository. `main` is the main repository. Each person needs a clone of the new repository. |
 | `sync.sh repos` | Shows the repositories and their projects. |
@@ -335,7 +365,10 @@ Example: move two work projects to the repository of the team:
 ```
 
 The hooks pull and push all repositories, and the PreToolUse hook checks the team memory
-of all repositories. The notices about a new release apply only to the main repository.
+of all repositories. The notices about a new release come from the main repository.
+
+To use a team repository as your main repository, give its URL in the prompt of
+section 1.
 
 ## 5. Memory roles
 
@@ -591,8 +624,9 @@ repository. The remote `upstream` is this repository. A release is a git tag `vX
    command that shows `UPDATE.md` of the new release.
 2. Claude tells you, reads `UPDATE.md` of the new release, and does the update. The
    instructions are in `CLAUDE-MEMORY.md`, section "Updates".
-3. `sync.sh update` merges the release tag into the memory repository, pushes it, and runs
-   `sync.sh setup` on this machine.
+3. `sync.sh update` merges the release tag into the main repository, pushes it, and runs
+   `sync.sh setup` on this machine. Then it puts the release into each project repository
+   with an older tool (section 4.7).
 4. The other machines and persons get the new version with their next `sync.sh pull`. If
    the release changes the setup of a machine, their SessionStart hook shows `SETUP`, and
    Claude runs `sync.sh setup` there.
@@ -925,11 +959,23 @@ git remote add origin MEMORY
 git push -u origin main
 ```
 
-If `MEMORY` has a branch `main`, a person installed the sync before:
+If `MEMORY` has a branch `main`, a person used the repository before:
 
 ```sh
 git clone MEMORY ~/.claude/claude-memory
 git -C ~/.claude/claude-memory remote add upstream TEMPLATE
+```
+
+If `REPO/sync.sh` does not exist, the repository has memory, but no tool (a project
+repository of a different person). Put the latest release into it. The repository keeps
+its own version of a file that the tool also has:
+
+```sh
+cd ~/.claude/claude-memory
+git fetch -q --tags upstream
+git merge --allow-unrelated-histories -X ours -m "Add claude-memory-sync" \
+  "$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
+git push
 ```
 
 Make sure that `REPO/sync.sh` is executable.
@@ -997,6 +1043,7 @@ tests/run.sh
 | `tests/test-roles.sh` | Roles, linking, adoption of a local memory, team memory check, disable, slug of a subdirectory and of a worktree |
 | `tests/test-update.sh` | Setup (with `jq` and with `python3`), notices, update, conflict at an update |
 | `tests/test-repos.sh` | More memory repositories: add-repo, enable --repo, move, relink, local copy |
+| `tests/test-shared-main.sh` | One repository as the main repository of one person and a project repository of an other person; tool in each repository; update of all copies |
 | `tests/test-migrate.sh` | `tools/migrate.sh`, `tools/validate.sh`, `tools/relink.sh` |
 
 Rules for a change:

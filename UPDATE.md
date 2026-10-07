@@ -112,6 +112,20 @@ example, the user changed the skill), and the release changes the same lines.
 Each release can add steps here. Do the steps of each release after the old version, in
 the sequence of the versions.
 
+### v0.3.0
+
+The `sync.sh` before v0.3.0 updates only the main repository. Thus run the update one
+more time. The new `sync.sh` then puts the tool into each project repository:
+
+```sh
+~/.claude/claude-memory/sync.sh update
+```
+
+The output shows each project repository under "Other memory repositories". Tell the
+user which repositories got the tool, and which did not change (no write access). Then
+tell the user that each memory repository can now be the main repository of a person
+(README.md, section 4.7).
+
 ### v0.2.1
 
 No more steps. After the update, you can run `~/.claude/claude-memory/tools/validate.sh`

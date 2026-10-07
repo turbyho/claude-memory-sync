@@ -8,7 +8,9 @@ invalidate a record.
 
 `<repo>` is the memory repository of the project: the main repository, or a different
 repository in `~/.claude/claude-memory.d/<alias>/`. `sync.sh status` shows it. The
-SessionStart hook gives the full paths.
+SessionStart hook gives the full paths. The main repository is the clone in
+`~/.claude/claude-memory` of this person. A repository can be the main repository of one
+person and a project repository of an other person. Each memory repository has the tool.
 
 ### Roles
 

@@ -4,6 +4,20 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.0 - 2026-10-07
+
+- All memory repositories are equal. Each one has the tool, thus a repository can be the
+  main repository of one person and a project repository of an other person. A person in
+  a team can use the team repository as the main repository, without a private one
+  (README.md, section 4.7).
+- `sync.sh add-repo` puts the tool into a repository that has none. A repository keeps
+  its own version of a file that the tool also has (for example `README.md`).
+- `sync.sh update` puts a new release also into your project repositories with an older
+  tool. A repository without write access does not change.
+- `sync.sh version` shows the tool version of each project repository.
+- What to do: after the update to v0.3.0, run `sync.sh update` one more time. It puts the
+  tool into your project repositories.
+
 ## v0.2.1 - 2026-10-07
 
 - New tools for the migration of an older memory (README.md, section 6.4):

@@ -418,11 +418,71 @@ push() {
   fi
 }
 
-# Version of the tool in the repository. A repository without VERSION is older than the
-# first release.
+# Version of the tool in repository $1 (default: the main repository). A repository
+# without VERSION is older than the first release, or has no tool.
 repo_version() {
-  v=$(cat "$REPO/VERSION" 2>/dev/null)
+  v=$(cat "${1:-$REPO}/VERSION" 2>/dev/null)
   echo "${v:-0.0.0}"
+}
+
+# Put the tool of release $2 into the other memory repository $1: merge the release tag,
+# then push. Each memory repository has the tool, thus a person can use it as the main
+# repository. The tag comes from the main repository. At a conflict, or if the push
+# fails, the repository does not change.
+tool_into() {
+  r=$1
+  tag=$2
+  a=$(repo_alias "$r")
+  (
+    cd "$r" || exit 1
+    wait_for_lock
+    git pull -q --rebase=merges --autostash >/dev/null 2>&1
+    if ! git fetch -q "$REPO" "refs/tags/$tag:refs/tags/$tag" >/dev/null 2>&1; then
+      echo "  \"$a\": cannot get $tag from the main repository. Not changed."
+      exit 1
+    fi
+    before=$(git rev-parse -q --verify HEAD)
+    # A repository without the tool keeps its own version of a file that the tool also
+    # has (for example README.md made by the git server).
+    keep=""
+    [ -f sync.sh ] || keep="-X ours"
+    if [ -z "$before" ]; then
+      # An empty repository: start the branch at the release.
+      git update-ref HEAD "$tag^{commit}"
+      git reset -q --hard
+    # shellcheck disable=SC2086
+    elif ! git merge -q --no-edit --allow-unrelated-histories $keep \
+        -m "Update claude-memory-sync to $tag" "$tag" >/dev/null 2>&1; then
+      files=$(git diff --name-only --diff-filter=U)
+      git merge --abort >/dev/null 2>&1
+      echo "  CONFLICT in \"$a\": the merge of $tag stopped. Not changed. Files:"
+      echo "$files" | sed 's/^/    /'
+      exit 1
+    fi
+    if ! git push -q -u origin HEAD >/dev/null 2>&1; then
+      if [ -n "$before" ]; then
+        git reset -q --hard "$before"
+      else
+        git update-ref -d "$(git symbolic-ref HEAD)"
+        git read-tree --empty
+        git clean -fdq
+      fi
+      echo "  \"$a\": cannot push (no write access, or no network). Not changed."
+      exit 1
+    fi
+    echo "  \"$a\": tool $tag"
+  )
+}
+
+# Bring the tool of release $1 into each other memory repository that has no tool or an
+# older tool. A repository with a newer tool does not change.
+tools_all() {
+  repos | while IFS= read -r r; do
+    [ "$r" = "$REPO" ] && continue
+    if [ ! -f "$r/sync.sh" ] || ver_gt "${1#v}" "$(repo_version "$r")"; then
+      tool_into "$r" "$1"
+    fi
+  done
 }
 
 # Is version $1 greater than version $2? Versions are X.Y.Z.
@@ -578,6 +638,10 @@ update() {
   new=$(latest_tag)
   if [ -z "$new" ] || ! ver_gt "${new#v}" "$cur"; then
     echo "Up to date: v$cur"
+    if git rev-parse -q --verify "refs/tags/v$cur" >/dev/null; then
+      out=$(tools_all "v$cur")
+      [ -z "$out" ] || { echo "Other memory repositories:"; echo "$out"; }
+    fi
     return 0
   fi
   echo "Update: v$cur -> $new"
@@ -593,7 +657,11 @@ update() {
   fi
   push
   echo "Merged and pushed: $new"
+  # The new sync.sh does the rest: setup of this machine, and the tool of the other
+  # memory repositories.
   "$REPO/sync.sh" setup
+  out=$("$REPO/sync.sh" tools-all "$new")
+  [ -z "$out" ] || { echo "Other memory repositories:"; echo "$out"; }
 }
 
 # Set dir, name, mem, repo (the repository of the project), pdir (the project) and udir
@@ -813,6 +881,13 @@ case "$1" in
         exit 1
       fi
     fi
+    if [ ! -f "$EXTRA/$a/sync.sh" ]; then
+      tag="v$(repo_version)"
+      if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+        echo "The repository has no tool. Add the tool $tag (then a person can use it as the main repository):"
+        tool_into "$EXTRA/$a" "$tag" || echo "  The repository stays without the tool. The sync of its projects operates."
+      fi
+    fi
     mkdir -p "$(dirname "$REPOS_CONF")"
     touch "$REPOS_CONF"
     if ! grep -q "^$a " "$REPOS_CONF"; then
@@ -928,10 +1003,22 @@ case "$1" in
   update)
     update || exit 1
     ;;
+  tools-all)
+    # Internal: the old sync.sh calls the new one after the merge of a release.
+    tools_all "$2"
+    ;;
   version)
     echo "Repository:      v$(repo_version)"
     echo "Latest release:  $(latest_tag) (from the remote \"upstream\", fetched by pull and update)"
     echo "Machine setup:   $(cat "$SETUP_FILE" 2>/dev/null || echo 0) (needed: $SETUP_VERSION)"
+    repos | while IFS= read -r r; do
+      [ "$r" = "$REPO" ] && continue
+      if [ -f "$r/sync.sh" ]; then
+        echo "Tool in \"$(repo_alias "$r")\": v$(repo_version "$r")"
+      else
+        echo "Tool in \"$(repo_alias "$r")\": none (sync.sh update adds it)"
+      fi
+    done
     ;;
   *)
     sed -n '2,40s/^# \{0,1\}//p' "$0" >&2
