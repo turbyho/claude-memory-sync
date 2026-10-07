@@ -591,12 +591,48 @@ and shared directories at the root that the projects link with symlinks), migrat
    ~/.claude/claude-memory/tools/validate.sh ~/.claude/claude-memory
    ```
 
-5. Point the memory symlinks of each machine to the new repository, then set up the
+5. Point the memory symlinks of this machine to the new repository, then set up the
    machine (section 6.3):
 
    ```sh
    ~/.claude/claude-memory/tools/relink.sh ~/.claude/claude-memory-old ~/.claude/claude-memory "$(~/.claude/claude-memory/sync.sh user)"
    ```
+
+6. On each other machine of the person (the data is migrated already, thus do not run
+   `migrate.sh` again):
+
+   1. In the old clone, make sure that all changes are pushed:
+      `git -C ~/.claude/claude-memory status -sb` must show no changes and no
+      `[ahead N]`. If the old remote got commits after the migration, merge their records
+      into the new repository by hand.
+   2. Rename the old clone, clone the new main repository, and add `upstream`:
+
+      ```sh
+      mv ~/.claude/claude-memory ~/.claude/claude-memory-old
+      git clone <new main repository> ~/.claude/claude-memory
+      git -C ~/.claude/claude-memory remote add upstream https://git.montyho.com/turbyho/claude-memory-sync.git
+      ```
+
+   3. Make sure that `~/.claude/claude-memory/sync.sh user` gives the same person name as
+      on the first machine. If not, set the email in the clone:
+      `git -C ~/.claude/claude-memory config user.email <email of the first machine>`.
+   4. Set up the machine, and clone the project repositories of the person:
+
+      ```sh
+      ~/.claude/claude-memory/sync.sh setup
+      ~/.claude/claude-memory/sync.sh pull < /dev/null
+      ```
+
+   5. Point the memory symlinks to the new repositories:
+
+      ```sh
+      ~/.claude/claude-memory/tools/relink.sh ~/.claude/claude-memory-old ~/.claude/claude-memory "$(~/.claude/claude-memory/sync.sh user)"
+      ```
+
+      A line `NOT IN A NEW REPOSITORY` shows a project that the migration did not have.
+      Its memory stays in the old clone.
+   6. Do a check: `sync.sh version`, `sync.sh list`, and `sync.sh status <dir>` in one
+      project of each repository. Then start a new Claude Code session.
 
 Keep the old repository until all your machines use the new one.
 

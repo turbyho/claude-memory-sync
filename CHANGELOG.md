@@ -4,6 +4,14 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.4 - 2026-10-07
+
+- Fixed: `tools/relink.sh` looked for a project only in the main repository. A project
+  in a project repository (`~/.claude/claude-memory.d/<alias>`) stayed linked to the old
+  clone. Now it looks in all repositories, and reports a project that it cannot find.
+- README.md, section 6.4, step 6: the procedure for each other machine after a migration.
+- Nothing to do for the user.
+
 ## v0.3.3 - 2026-10-07
 
 - New command `sync.sh rename-repo <old alias> <new alias> [<url>]`: renames the alias

@@ -98,7 +98,17 @@ check "visible-notes changes nothing the second time" cmp -s "$V" "$T/v1"
 # relink: a symlink to the old repository goes to the new one.
 mkdir -p "$T/home/.claude/projects/-src-app"
 ln -s "$O/projects/app" "$T/home/.claude/projects/-src-app/memory"
+# A project that moved to a project repository after the migration.
+mkdir -p "$T/home/.claude/claude-memory.d/team/projects/web/users/alice"
+rm -rf "$N/web"
+mkdir -p "$T/home/.claude/projects/-src-web"
+ln -s "$O/projects/web" "$T/home/.claude/projects/-src-web/memory"
+mkdir -p "$T/home/.claude/projects/-src-gone"
+ln -s "$O/projects/gone" "$T/home/.claude/projects/-src-gone/memory"
 HOME=$T/home sh "$SRC/tools/relink.sh" "$O" "$T/new" alice >/dev/null
+code=$?
 check "relink points the symlink to the new personal memory" [ "$(readlink "$T/home/.claude/projects/-src-app/memory")" = "$N/app/users/alice" ]
+check "relink finds a project in a project repository" [ "$(readlink "$T/home/.claude/projects/-src-web/memory")" = "$T/home/.claude/claude-memory.d/team/projects/web/users/alice" ]
+check "relink leaves an unknown project and reports it" sh -c '[ "$1" = 1 ] && [ "$(readlink "$2")" = "$3" ]' x "$code" "$T/home/.claude/projects/-src-gone/memory" "$O/projects/gone"
 
 finish
