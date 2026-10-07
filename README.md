@@ -135,11 +135,22 @@ person and a project repository of an other person:
 
 ### 2.3 Roles of a record
 
-| Role | Location | Who uses it | Loaded at session start | Rules |
-|---|---|---|---|---|
-| Team | `projects/<name>/team/` | All persons of the repository | An index that the hook makes from the records | No absolute paths, no machine names, no links outside the project. A hook blocks such a write. Claude writes only after your approval. |
-| Personal | `projects/<name>/users/<user>/` | One person, on all machines of the person | `MEMORY.md` | Facts about you and the project that are correct on all your machines |
-| Local | `projects/<name>/users/<user>/hosts/<host>/` | One person, on one machine | `hosts/<host>/INDEX.md` | Paths, devices, settings of one machine |
+The paths in this table are relative to `projects/<name>/`.
+
+| Role | Location | Loaded at session start |
+|---|---|---|
+| Team | `team/` | An index that the hook makes from the records |
+| Personal | `users/<user>/` | `MEMORY.md` |
+| Local | `users/<user>/hosts/<host>/` | `hosts/<host>/INDEX.md` |
+
+Who uses each role, and what it contains:
+
+- **Team** — all persons of the repository. No absolute paths, no machine names, no
+  links outside the project. A hook blocks such a write. Claude writes only after your
+  approval.
+- **Personal** — one person, on all machines of the person. Facts about you and the
+  project that are correct on all your machines.
+- **Local** — one person, on one machine. Paths, devices, settings of one machine.
 
 Claude selects the role:
 
