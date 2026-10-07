@@ -6,7 +6,7 @@ the structure (section 2) and the setups (section 3).
 
 In this file:
 
-- `TEMPLATE` is `https://git.montyho.com/turbyho/claude-memory-sync.git`.
+- `TEMPLATE` is `https://github.com/turbyho/claude-memory-sync.git`.
 - `MAIN` is the URL of the main memory repository of the user (from the prompt).
 - `REPO` is `~/.claude/claude-memory`.
 - `sync.sh` is `~/.claude/claude-memory/sync.sh`.

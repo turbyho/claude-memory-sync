@@ -4,6 +4,13 @@ Each release is a git tag `vX.Y.Z`. Claude reads this file during an update and 
 user the changes. Write the changes for the user: what is new, what is different, what
 the user must do.
 
+## v0.3.10 - 2026-10-07
+
+- The tool is on GitHub: https://github.com/turbyho/claude-memory-sync. README.md and
+  INSTALL.md use this address for the installation. The development repository stays on
+  git.montyho.com.
+- Nothing to do for the user. An existing `upstream` remote stays as it is.
+
 ## v0.3.9 - 2026-10-07
 
 - README.md, SKILL.md and the tests use invented examples: the projects `recipe-book`

@@ -236,7 +236,7 @@ You can change the setup later:
 **The first machine, a new main repository:**
 
 ```text
-Install claude-memory-sync from https://git.montyho.com/turbyho/claude-memory-sync.
+Install claude-memory-sync from https://github.com/turbyho/claude-memory-sync.
 Clone it to a temporary directory, read its INSTALL.md, and do the procedure.
 
 My main memory repository is git@git.example.com:alice/claude-memory.git.
@@ -270,7 +270,7 @@ team repository as the main memory repository in the first prompt.
      push it:
 
      ```sh
-     git clone https://git.montyho.com/turbyho/claude-memory-sync.git ~/.claude/claude-memory
+     git clone https://github.com/turbyho/claude-memory-sync.git ~/.claude/claude-memory
      cd ~/.claude/claude-memory
      git reset -q --hard "$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
      git remote rename origin upstream
@@ -282,7 +282,7 @@ team repository as the main memory repository in the first prompt.
 
      ```sh
      git clone git@git.example.com:alice/claude-memory.git ~/.claude/claude-memory
-     git -C ~/.claude/claude-memory remote add upstream https://git.montyho.com/turbyho/claude-memory-sync.git
+     git -C ~/.claude/claude-memory remote add upstream https://github.com/turbyho/claude-memory-sync.git
      ```
 
 2. Set up the machine:
@@ -524,6 +524,10 @@ The fact.
 
 ## 9. Development and releases
 
+The development repository is `https://git.montyho.com/turbyho/claude-memory-sync`. The
+repository on GitHub is a copy: it gets the branch `main` and the release tags at each
+release. Use the GitHub repository to install and to update.
+
 ### 9.1 Tests
 
 ```sh
@@ -559,13 +563,14 @@ the tests do not touch your `~/.claude`.
 3. Add a section `### vX.Y.Z` to `UPDATE.md`, "Steps for each release". If the update
    needs more steps (for example a change of the memory layout), write them there.
 4. Run `tests/run.sh`.
-5. Commit, tag and push. Do not change a tag after the push: if a release is wrong,
-   publish a new release.
+5. Commit, tag and push to the development repository and to GitHub. Do not change a tag
+   after the push: if a release is wrong, publish a new release.
 
    ```sh
    git commit -am "Release vX.Y.Z"
    git tag vX.Y.Z
-   git push origin main vX.Y.Z
+   git push origin main vX.Y.Z      # development repository
+   git push github main vX.Y.Z      # copy on GitHub
    ```
 
 The memory repositories find the release within 24 hours.
